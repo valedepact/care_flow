@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:care_flow/screens/login_page.dart';
+import 'package:care_flow/screens/register_page.dart';
 
 void main(){
   runApp(MyApp());
 }
 class MyApp extends StatelessWidget{
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,9 +22,11 @@ class MyApp extends StatelessWidget{
 }
 class MyHomePage extends StatefulWidget{
   @override
-  _MyHomePageState createState()=> _MyHomePageState();
+  MyHomePageState createState() {
+    return MyHomePageState();
+  }
 }
-class _MyHomePageState extends State<MyHomePage> {
+class MyHomePageState extends State<MyHomePage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -29,7 +35,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final _registerEmailController = TextEditingController();
   final _registerPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String _selectedRole = "Nurse";
+  final String _selectedRole = "Nurse"; //this variable's value won't change
   @override
   Widget build(BuildContext context){
   return Scaffold(
@@ -46,9 +52,9 @@ class _MyHomePageState extends State<MyHomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(child: _LoginCard()),
+              Expanded(child: LoginCard()),
               SizedBox(width: 16),
-              Expanded(child: _RegisterCard()),
+              Expanded(child: RegisterCard()),
             ],
           ),
           SizedBox(height: 24),
@@ -90,144 +96,5 @@ class _MyHomePageState extends State<MyHomePage> {
   );
   }
 }
-class _LoginCard extends StatelessWidget{
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Text("Login in into your account",
-          style: TextStyle(fontSize: 18,
-          fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          TextFormField(
-            decoration: InputDecoration(
-              labelText: "Username or email",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          SizedBox(height: 16),
-          TextFormField(
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: "Password",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            child: Text("Login"),
-            onPressed: () {
-            //login logic lies here
-            Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => DashboardPage()),
-            );
-          },
-          ),
-          SizedBox(height: 8),
-          TextButton(child: Text("Forgot Password?"),
-          onPressed: () {
-            //forgot password logic will lie here
-          },
-          ),
-        ],
-      ),),
-    );
-  }
-}
-class _RegisterCard extends StatelessWidget{
-  @override
-  Widget build(BuildContext context){
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Text("Create a New Account",
-            style: TextStyle(fontSize:18,fontWeight:FontWeight.bold),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Full Name",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Username",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Confirm Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            DropdownButtonFormField(
-              decoration: InputDecoration(
-                labelText: "Role",
-                border: OutlineInputBorder(),
-              ),
-                value: "Nurse",
-                onChanged: (newValue){
-                //Role selection logic falls here
-                },
-            items: [
-              DropdownMenuItem(child:Text("Nurse"),
-              value:"Nurse",
-              ),
-            ],
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(child: Text("Register"),
-            onPressed: () {
-              //registration logic lies over here
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => DashboardPage()),
-              );
-            },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class DashboardPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar:AppBar(
-        title: Text("Care Flow Dashboard"),
-      ),
-      body:Center(
-          child: Text("Welcome to Care Flow!"),
-      ),
-    );
-  }
-}
+
+
