@@ -57,6 +57,13 @@
       "dependencies": []
     },
     {
+      "name": "font_awesome_flutter",
+      "version": "10.8.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
       "name": "flutter",
       "version": "0.0.0",
       "dependencies": [
@@ -235,13 +242,6 @@
       "name": "sky_engine",
       "version": "0.0.0",
       "dependencies": []
-    },
-    {
-      "name": "font_awesome_flutter",
-      "version": "10.8.0",
-      "dependencies": [
-        "flutter"
-      ]
     }
   ],
   "configVersion": 1

@@ -1,232 +1,172 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-void main(){
+void main() {
   runApp(MyApp());
 }
-class MyApp extends StatelessWidget{
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Care Flow',
+      title: 'Nurse Patient Monitor',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.green,
+        fontFamily: 'Roboto',
       ),
-      home: MyHomePage(),
+      home: PatientProfilePage(),
     );
   }
 }
-class MyHomePage extends StatefulWidget{
-  @override
-  _MyHomePageState createState()=> _MyHomePageState();
-}
-class _MyHomePageState extends State<MyHomePage> {
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _fullNameController = TextEditingController();
-  final _registerUsernameController = TextEditingController();
-  final _registerEmailController = TextEditingController();
-  final _registerPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  String _selectedRole = "Nurse";
-  @override
-  Widget build(BuildContext context){
-  return Scaffold(
-    body: SingleChildScrollView(
-      child: Column(
-        children: [
-          SizedBox(height: 32),
-          Center(
-            child: Text("Care Flow",
-            style: TextStyle(fontSize:24, fontWeight: FontWeight.bold),
-            ),
-          ),
-          SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(child: _LoginCard()),
-              SizedBox(width: 16),
-              Expanded(child: _RegisterCard()),
-            ],
-          ),
-          SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextButton(onPressed: () {},
-                  child:Text("Terms and Conditions"),
-              ),
-              VerticalDivider(),
-              TextButton(
-                onPressed: () {},
-                child: Text("Privacy Policy"),
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
-          Text("Or login with"),
-          SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
-              icon: FaIcon(FontAwesomeIcons.google),
-                  label: Text("Google"),
-                onPressed: () {},
-              ),
-              SizedBox(width: 16),
-              ElevatedButton.icon(
-                icon: Icon(Icons.facebook),
-                label: Text("Facebook"),
-                onPressed: () {},
-              ),
-            ],
-          )
-        ],
-      ),
-    ),
-  );
-  }
-}
-class _LoginCard extends StatelessWidget{
+
+class PatientProfilePage extends StatelessWidget {
+  final Map<String, dynamic> patientData = {
+    'name': 'HELLEN ',
+    'age': 20,
+    'gender': 'Female',
+    'contact': '0709497401',
+    'location': 'Kakoba,Mbarara',
+    'emergency': false,
+    'vitals': {
+      'Heart Rate': '70 bpm',
+      'Temperature': '35.8 °C',
+      'Blood Pressure': '100/80 mmHg',
+    }
+  };
+
+  PatientProfilePage({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Text("Login in into your account",
-          style: TextStyle(fontSize: 18,
-          fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          TextFormField(
-            decoration: InputDecoration(
-              labelText: "Username or email",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          SizedBox(height: 16),
-          TextFormField(
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: "Password",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            child: Text("Login"),
-            onPressed: () {
-            //login logic lies here
-            Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => DashboardPage()),
-            );
-          },
-          ),
-          SizedBox(height: 8),
-          TextButton(child: Text("Forgot Password?"),
-          onPressed: () {
-            //forgot password logic will lie here
-          },
-          ),
-        ],
-      ),),
-    );
-  }
-}
-class _RegisterCard extends StatelessWidget{
-  @override
-  Widget build(BuildContext context){
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+    final isEmergency = patientData['emergency'];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Patient Profile"),
+        backgroundColor: Colors.blue,
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
         child: Column(
           children: [
-            Text("Create a New Account",
-            style: TextStyle(fontSize:18,fontWeight:FontWeight.bold),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Full Name",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Username",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Confirm Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            DropdownButtonFormField(
-              decoration: InputDecoration(
-                labelText: "Role",
-                border: OutlineInputBorder(),
-              ),
-                value: "Nurse",
-                onChanged: (newValue){
-                //Role selection logic falls here
-                },
-            items: [
-              DropdownMenuItem(child:Text("Nurse"),
-              value:"Nurse",
-              ),
-            ],
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(child: Text("Register"),
-            onPressed: () {
-              //registration logic lies over here
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => DashboardPage()),
-              );
-            },
-            ),
+            _buildProfileCard(),
+            SizedBox(height: 20),
+            _buildVitalsCard(),
+            SizedBox(height: 20),
+            _buildLocationCard(context),
+            if (isEmergency) _buildEmergencyBanner(),
           ],
         ),
       ),
     );
   }
-}
-class DashboardPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar:AppBar(
-        title: Text("Care Flow Dashboard"),
+
+  Widget _buildProfileCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.orange[100],
+              child: Icon(Icons.person, size: 50, color: Colors.white),
+            ),
+            SizedBox(height: 10),
+            Text(patientData['name'], style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            SizedBox(height: 5),
+            Text("Age: ${patientData['age']} | Gender: ${patientData['gender']}"),
+            SizedBox(height: 5),
+            Text("Contact: ${patientData['contact']}"),
+          ],
+        ),
       ),
-      body:Center(
-          child: Text("Welcome to Care Flow!"),
+    );
+  }
+
+  Widget _buildVitalsCard() {
+    final vitals = patientData['vitals'] as Map<String, String>;
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Vitals", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Divider(),
+            ...vitals.entries.map((entry) => ListTile(
+              leading: Icon(Icons.monitor_heart, color: Colors.red),
+              title: Text(entry.key),
+              trailing: Text(entry.value, style: TextStyle(fontWeight: FontWeight.w600)),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationCard(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Patient Location", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.location_on, color: Colors.grey),
+                SizedBox(width: 8),
+                Expanded(child: Text(patientData['location'])),
+              ],
+            ),
+            SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Launching directions..."))
+                );
+              },
+              icon: Icon(Icons.directions),
+              label: Text("Get Directions"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyBanner() {
+    return Container(
+      margin: EdgeInsets.only(top: 20),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red[700],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning, color: Colors.white),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "Emergency detected! Immediate attention needed.",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          )
+        ],
       ),
     );
   }
