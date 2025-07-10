@@ -10,15 +10,15 @@ class VisitSchedulePage extends StatelessWidget{
         children: [
           _TopHeaderSection(), //top header/control section
           Expanded(child: Row(
-           children: [
-             Flexible(flex: 2,
-             child: _PatientListSection(),//left panel is for patient list
-             ),
-             Flexible(
-               flex: 3,
-               child: _CalenderAndVisitDetailsSection(),//right panel is for calender
-             ),
-           ],
+            children: [
+              Flexible(flex: 2,
+                child: _PatientListSection(),//left panel is for patient list
+              ),
+              Flexible(
+                flex: 3,
+                child: _CalenderAndVisitDetailsSection(),//right panel is for calender
+              ),
+            ],
           )
           )
         ],
@@ -38,82 +38,82 @@ class _TopHeaderSection extends StatelessWidget{
           Row(
             children: [
               Text('Visit Schedule',
-              style: TextStyle(fontSize: 18,
-              fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               Row(
                 children: [
                   ElevatedButton.icon(
-                  label: Text('Schedule Visit'),
-                      icon:Icon(Icons.calendar_today),
-                  onPressed: () {},
+                    label: Text('Schedule Visit'),
+                    icon:Icon(Icons.calendar_today),
+                    onPressed: () {},
                   ),
                   SizedBox(width: 8),
                   OutlinedButton(onPressed: () {},
-                      child: Text('Reschedule'),
+                    child: Text('Reschedule'),
                   ),
                   SizedBox(width: 8),
                   OutlinedButton(onPressed: () {},
-                      child: Text('Cancel'),
+                    child: Text('Cancel'),
                   ),
                   SizedBox(width:8),
                   DropdownButton(
-                      value:'Options',
-                      items: const [
-                        DropdownMenuItem(value: 'Options',child: Text('Options'),
-                        ),
-                      ],
-                      onChanged: (value){},
+                    value:'Options',
+                    items: const [
+                      DropdownMenuItem(value: 'Options',child: Text('Options'),
+                      ),
+                    ],
+                    onChanged: (value){},
                   )
                 ],
               )
             ],
           ),
-      SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(child: DropdownButtonFormField<String>(
-          decoration: InputDecoration(
-          labelText: 'Filters',
-        border: OutlineInputBorder(),
-      ),
-      value: 'Filters',
-      items: const[
-        DropdownMenuItem(value: 'Filters',child: Text('Filters'),
-        ),
-      ],
-      onChanged: (value) {},
-         ),
-          ),
-          SizedBox(width: 8),
-          Expanded(child: DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              labelText:'Date Range',
-              border: OutlineInputBorder(),
-            ),
-            value: 'Date Range',
-            items: const[
-              DropdownMenuItem(value: 'Date Range',child: Text('Date Range'),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Filters',
+                  border: OutlineInputBorder(),
+                ),
+                value: 'Filters',
+                items: const[
+                  DropdownMenuItem(value: 'Filters',child: Text('Filters'),
+                  ),
+                ],
+                onChanged: (value) {},
               ),
+              ),
+              SizedBox(width: 8),
+              Expanded(child: DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText:'Date Range',
+                  border: OutlineInputBorder(),
+                ),
+                value: 'Date Range',
+                items: const[
+                  DropdownMenuItem(value: 'Date Range',child: Text('Date Range'),
+                  ),
+                ],
+                onChanged: (value) {},
+              ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Search patient or visit...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              )
             ],
-            onChanged: (value) {},
-          ),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              decoration: InputDecoration(
-                labelText: 'Search patient or visit...',
-                border: OutlineInputBorder(),
-              ),
-            ),
           )
         ],
-      )
-     ],
-    ),
+      ),
     );
   }
 }
@@ -123,28 +123,28 @@ class _PatientListSection extends StatelessWidget{
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('April 2024',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('April 2024',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildPatientVisitCard('Anna Davis'),
+                SizedBox(height: 8),
+                _buildPatientVisitCard('Walter Reed', isSelected: true),
+                SizedBox(height: 8),
+                _buildPatientVisitCard('Fred Somme'),
+                SizedBox(height: 8),
+                _buildPatientVisitCard('Sara grids'),
+              ],
             ),
-            SizedBox(height: 16),
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildPatientVisitCard('Anna Davis'),
-                  SizedBox(height: 8),
-                  _buildPatientVisitCard('Walter Reed', isSelected: true),
-                  SizedBox(height: 8),
-                  _buildPatientVisitCard('Fred Somme'),
-                  SizedBox(height: 8),
-                  _buildPatientVisitCard('Sara grids'),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -153,7 +153,7 @@ _buildPatientVisitCard(String name, {bool isSelected = false}) {
   return Container(
     decoration: BoxDecoration(
       border: Border.all(
-        color: isSelected ? Colors.blue : Colors.grey
+          color: isSelected ? Colors.blue : Colors.grey
       ),
       borderRadius: BorderRadius.circular(8),
     ),
@@ -182,69 +182,69 @@ class _CalenderAndVisitDetailsSection extends StatelessWidget{
           SizedBox(height: 16),
           Text('Visit Details'),
           Expanded(
-              child: Row(
-               children: [
-                 Expanded(child: Card(
-                   child: Padding(
-                     padding: const EdgeInsets.all(16),
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         Text(
-                           'Patient Health Information',
-                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                         ),
-                         SizedBox(height: 16),
-                         _buildDetailInfoRow('Conditions'),
-                         SizedBox(height: 8),
-                         _buildDetailInfoRow('Allergies'),
-                         SizedBox(height: 8),
-                         _buildDetailInfoRow('Medications'),
-                         SizedBox(height: 8),
-                         _buildDetailInfoRow('Key History'),
-                       ],
-                     ),
-                   ),
-                 ),
-                 ),
-                 SizedBox(width: 16),
-                 Expanded(child: Card(
-                   child: Padding(
-                       padding: const EdgeInsets.all(16),
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         Text('Visit Specific Notes and Actions',
-                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                         ),
-                         SizedBox(height: 16),
-                         _buildDetailInfoRow('Required Actions'),
-                         SizedBox(height: 16),
-                         Text('Add New Notes:'),
-                         SizedBox(height: 8),
-                         Expanded(child: TextField(
-                           minLines: 5,
-                           maxLines: null,
-                           decoration: InputDecoration(
-                             border: OutlineInputBorder(),
-                           ),
-                         ),
-                         ),
-                         SizedBox(height: 16),
-                         Align(
-                           alignment: Alignment.bottomRight,
-                           child: ElevatedButton(
-                               onPressed:() {},
-                               child: Text('Update Notes'),
-                           ),
-                         ),
-                       ],
-                     ),
-                   ),
-                 ),
-                 ),
-               ],
-              ),
+            child: Row(
+              children: [
+                Expanded(child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Patient Health Information',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 16),
+                        _buildDetailInfoRow('Conditions'),
+                        SizedBox(height: 8),
+                        _buildDetailInfoRow('Allergies'),
+                        SizedBox(height: 8),
+                        _buildDetailInfoRow('Medications'),
+                        SizedBox(height: 8),
+                        _buildDetailInfoRow('Key History'),
+                      ],
+                    ),
+                  ),
+                ),
+                ),
+                SizedBox(width: 16),
+                Expanded(child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Visit Specific Notes and Actions',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 16),
+                        _buildDetailInfoRow('Required Actions'),
+                        SizedBox(height: 16),
+                        Text('Add New Notes:'),
+                        SizedBox(height: 8),
+                        Expanded(child: TextField(
+                          minLines: 5,
+                          maxLines: null,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        ),
+                        SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: ElevatedButton(
+                            onPressed:() {},
+                            child: Text('Update Notes'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -272,7 +272,7 @@ _buildCalenderSection() {
       Row(
         children: [
           IconButton(
-              icon: Icon(Icons.chevron_left),
+            icon: Icon(Icons.chevron_left),
             onPressed: () {},
           ),
           Text(
@@ -280,7 +280,7 @@ _buildCalenderSection() {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           IconButton(
-              icon: Icon(Icons.chevron_right),
+            icon: Icon(Icons.chevron_right),
             onPressed: () {},
           ),
         ],
@@ -316,7 +316,7 @@ _buildCalenderSection() {
             ),
             child: Center(
               child: Text(
-                  (index + 1).toString(),
+                (index + 1).toString(),
                 style: TextStyle(fontSize: 16),
               ),
             ),

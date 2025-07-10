@@ -1,61 +1,224 @@
-import 'package:care_flow/screens/alert_page.dart';
-import 'package:care_flow/screens/emergency_alerts_page.dart';
-import 'package:care_flow/screens/login_page.dart';
-import 'package:care_flow/screens/nurse_dashboard_board.dart';
-import 'package:care_flow/screens/visit_schedule_page.dart';
+import 'package:care_flow/screens/login_page.dart'; // Assuming LoginCard is defined here
+import 'package:care_flow/screens/register_page.dart'; // Assuming RegisterCard is defined here
 import 'package:flutter/material.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:AppBar(
-        title: Text("Care Flow Dashboard"),
+      // No AppBar for a clean welcome screen look
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 40),
+
+              // 1. Logo and System Name
+              // Using a placeholder image for the logo. You should replace 'assets/logo.png'
+              // with your actual logo path and ensure it's added to your pubspec.yaml.
+              Image.network(
+                'https://placehold.co/100x100/007BFF/FFFFFF?text=Logo', // Placeholder logo
+                height: 100,
+                width: 100,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.local_hospital,
+                  size: 100,
+                  color: Colors.blue,
+                ), // Fallback icon
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'CareFlow',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 2. Tagline
+              Text(
+                "Streamlining healthcare for a better patient experience",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.grey[700],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // 3. Short Description
+              Text(
+                "CareFlow is a comprehensive healthcare management system connecting patients, providers, and facilities for efficient care coordination.",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey[800],
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              // 4. Key Features Highlights
+              Text(
+                'Key Features',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildFeatureItem(context, Icons.medical_services, 'Patient portal for secure access to medical records'),
+              _buildFeatureItem(context, Icons.calendar_today, 'Appointment scheduling and reminders'),
+              _buildFeatureItem(context, Icons.video_call, 'Telemedicine consultations'),
+              _buildFeatureItem(context, Icons.receipt_long, 'Prescription management'),
+              _buildFeatureItem(context, Icons.group, 'Care team collaboration tools'),
+              const SizedBox(height: 40),
+
+              // 5. Call-to-Action (CTA) Buttons
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // Adjust button layout based on screen width
+                  if (constraints.maxWidth > 600) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildCTAButton(context, 'Login', () {
+                          // Navigate to Login Page (or show LoginCard in a dialog/overlay)
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginCard()), // Assuming LoginCard is a full page for now
+                          );
+                          print('Login button pressed');
+                        }),
+                        const SizedBox(width: 20),
+                        _buildCTAButton(context, 'Sign Up', () {
+                          // Navigate to Sign Up Page (or show RegisterCard in a dialog/overlay)
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RegisterCard()), // Assuming RegisterCard is a full page for now
+                          );
+                          print('Sign Up button pressed');
+                        }),
+                        const SizedBox(width: 20),
+                        _buildOutlinedCTAButton(context, 'Learn More', () {
+                          // Handle Learn More action (e.g., scroll to a section, open a URL)
+                          print('Learn More button pressed');
+                        }),
+                      ],
+                    );
+                  } else {
+                    return Column(
+                      children: [
+                        _buildCTAButton(context, 'Login', () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginCard()),
+                          );
+                        }),
+                        const SizedBox(height: 16),
+                        _buildCTAButton(context, 'Sign Up', () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RegisterCard()),
+                          );
+                        }),
+                        const SizedBox(height: 16),
+                        _buildOutlinedCTAButton(context, 'Learn More', () {
+                          print('Learn More button pressed');
+                        }),
+                      ],
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 40),
+
+              // 6. Visuals (Placeholder)
+              // You can replace this with a more complex illustration or image carousel
+              Image.network(
+                'https://placehold.co/600x300/E0F2F7/007BFF?text=Healthcare+Illustration', // Placeholder illustration
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 300,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 300,
+                  width: double.infinity,
+                  color: Colors.blue.shade50,
+                  child: Center(
+                    child: Text(
+                      'Healthcare Illustration Placeholder',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue.shade700),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
       ),
-      body: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  // Helper method to build feature list items
+  Widget _buildFeatureItem(BuildContext context, IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // Center the features
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: LoginCard()),
-          SizedBox(width: 16),
-          Expanded(child: ElevatedButton(child: Text('Visit Schedule'),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => VisitSchedulePage()),
-            );
-          },
-          ),
-          ),
-          Expanded(child: ElevatedButton(child: Text('Alerts'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AlertsPage()),
-              );
-            },
-          ),
-          ),
-          Expanded(child: ElevatedButton(child: Text('Emergency'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => EmergencyAlertsPage()),
-              );
-            },
-          ),
-          ),
-          Expanded(child: ElevatedButton(child: Text('Care giver Dashboard'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CaregiverDashboard()),
-              );
-            },
-          ),
+          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  // Helper method to build primary CTA buttons
+  Widget _buildCTAButton(BuildContext context, String text, VoidCallback onPressed) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        elevation: 5,
+      ),
+      child: Text(text),
+    );
+  }
+
+  // Helper method to build outlined CTA buttons
+  Widget _buildOutlinedCTAButton(BuildContext context, String text, VoidCallback onPressed) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.primary,
+        side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      child: Text(text),
     );
   }
 }

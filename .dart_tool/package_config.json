@@ -51,9 +51,9 @@
     },
     {
       "name": "flutter_lints",
-      "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lints-5.0.0",
+      "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lints-6.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.5"
+      "languageVersion": "3.8"
     },
     {
       "name": "flutter_test",
@@ -66,6 +66,12 @@
       "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/font_awesome_flutter-10.8.0",
       "packageUri": "lib/",
       "languageVersion": "3.0"
+    },
+    {
+      "name": "intl",
+      "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/intl-0.20.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "leak_tracker",
@@ -87,9 +93,9 @@
     },
     {
       "name": "lints",
-      "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/lints-5.1.1",
+      "rootUri": "file:///C:/Users/Vale%20de%20Pact/AppData/Local/Pub/Cache/hosted/pub.dev/lints-6.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.6"
+      "languageVersion": "3.8"
     },
     {
       "name": "matcher",
