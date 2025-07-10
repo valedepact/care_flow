@@ -1,4 +1,4 @@
-import'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AlertsPage extends StatefulWidget {
   const AlertsPage({super.key});
@@ -7,309 +7,244 @@ class AlertsPage extends StatefulWidget {
   State<AlertsPage> createState() => _AlertsPageState();
 }
 
-class AlertListItem extends StatelessWidget {
-  final String patientName;
-  final String alertType;
-  final String timestamp;
-  final Function onPressed;
-  const AlertListItem({super.key,
-    required this.patientName,
-    required this.alertType,
-    required this.timestamp,
-    required this.onPressed,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundImage: AssetImage('assets/patient_image.png'),
-      ),
-      title: Text(patientName),
-      subtitle: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            color: Colors.red,
-            child: Text(alertType),
-          ),
-          SizedBox(width: 8),
-          Text(timestamp),
-        ],
-      ),
-      onTap: onPressed as VoidCallback,
-    );
-  }
-}
-
 class _AlertsPageState extends State<AlertsPage> {
-  String _selectedAlertType = 'All';
-  String _selectedStatus= 'All';
-  get _selectedPatientName => 'All Patients';
+  final TextEditingController _descriptionController = TextEditingController();
+  String? _selectedPatient; // For nurses to select a patient
+  String? _selectedRecipientRole; // To whom the alert is primarily directed (Patient/Nurse)
+  String _selectedAlertType = 'General Reminder';
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay _selectedTime = TimeOfDay.now();
+
+  // Dummy data for patient selection
+  final List<String> _patients = ['John Kelly', 'Greg Teri', 'Anna Davis', 'Walter Reed'];
+  final List<String> _alertTypes = ['General Reminder', 'Visit Reminder', 'Medication Alert', 'Activity Reminder'];
+  final List<String> _recipientRoles = ['Patient', 'Nurse', 'Doctor']; // Can be expanded
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
+  }
+
+  void _scheduleReminder() {
+    // Here you would implement the logic to save/send the reminder.
+    // This could involve sending data to a backend, scheduling local notifications, etc.
+    print('Scheduling Reminder:');
+    print('Description: ${_descriptionController.text}');
+    print('Patient: ${_selectedPatient ?? "N/A"}');
+    print('Recipient Role: ${_selectedRecipientRole ?? "N/A"}');
+    print('Alert Type: $_selectedAlertType');
+    print('Date: ${_selectedDate.toLocal().toIso8601String().split('T')[0]}');
+    print('Time: ${_selectedTime.format(context)}');
+
+    // Show a confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Reminder "${_descriptionController.text}" scheduled!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Optionally clear fields after scheduling
+    _descriptionController.clear();
+    setState(() {
+      _selectedPatient = null;
+      _selectedRecipientRole = null;
+      _selectedAlertType = 'General Reminder';
+      _selectedDate = DateTime.now();
+      _selectedTime = TimeOfDay.now();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Row(
-        children: [
-          Text('Alerts'),
-          Spacer(),
-          Stack(
-            children: [
-              Icon(Icons.notifications),
-              Positioned(
-                top:0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.all(1),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.red,
-                  ),
-                  child: Text(
-                    '1',
-                    style: TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                ),
+      appBar: AppBar(
+        title: const Text('Schedule New Reminder/Activity'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reminder Details',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
               ),
-            ],
-          )
-        ],
-      ),),
-      body: Column(
-        children: [
-          //Filter and Search Section
-          Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 24),
+
+            // Description of the reminder/activity
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Reminder/Activity Description',
+                hintText: 'e.g., "Administer medication", "Follow-up visit"',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.description),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
+
+            // Patient Selection (primarily for nurses)
+            DropdownButtonFormField<String>(
+              value: _selectedPatient,
+              hint: const Text('Select Patient (Optional)'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person_search),
+              ),
+              items: _patients.map((String patient) {
+                return DropdownMenuItem<String>(
+                  value: patient,
+                  child: Text(patient),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedPatient = newValue;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Recipient Role Selection
+            DropdownButtonFormField<String>(
+              value: _selectedRecipientRole,
+              hint: const Text('Alert Recipient Role'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.group),
+              ),
+              items: _recipientRoles.map((String role) {
+                return DropdownMenuItem<String>(
+                  value: role,
+                  child: Text(role),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedRecipientRole = newValue;
+                });
+              },
+              validator: (value) => value == null ? 'Please select a recipient role' : null,
+            ),
+            const SizedBox(height: 24),
+
+            // Alert Type Selection
+            DropdownButtonFormField<String>(
+              value: _selectedAlertType,
+              decoration: const InputDecoration(
+                labelText: 'Alert Type',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              items: _alertTypes.map((String type) {
+                return DropdownMenuItem<String>(
+                  value: type,
+                  child: Text(type),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedAlertType = newValue!;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Date and Time Pickers
+            Row(
               children: [
-                Text('Filter and search',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Search',
-                    border: OutlineInputBorder(),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Date',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_month),
+                      ),
+                      child: Text(
+                        '${_selectedDate.toLocal().toIso8601String().split('T')[0]}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
                   ),
                 ),
-                SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    DropdownButton(
-                      value: _selectedAlertType,
-                      items: [
-                        DropdownMenuItem(value: 'All', child: Text('All')),
-                        DropdownMenuItem(value: 'Emergency', child: Text('Emergency')),
-                        DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
-                      ],
-                      onChanged: (value){
-                        setState(() {
-                          _selectedAlertType = value!;
-                        });
-                      },
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectTime(context),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Time',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(
+                        _selectedTime.format(context),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
-                    DropdownButton(
-                      value: _selectedStatus,
-                      items:[
-                        DropdownMenuItem(value: 'All', child: Text('All')),
-                        DropdownMenuItem(value: 'Active', child: Text('Active')),
-                        DropdownMenuItem(value: 'Resolved', child: Text('Resolved')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedStatus = value!;
-                        });
-                      },
-                    ),
-                    DropdownButton(
-                      value: _selectedPatientName,
-                      items:[
-                        DropdownMenuItem(value: 'All Patients', child: Text('All Patients')),
-                        DropdownMenuItem(value: 'John Kelly', child: Text('John Kelly')),
-                        DropdownMenuItem(value: 'Greg teri', child: Text('Greg Teri')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedStatus = value as String;
-                        });
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-          //Main Content Area
-          Expanded(child: Row(
-            children: [
-              //Alert List Column
-              Expanded(
-                  child: Column(
-                    children: [
-                      Padding(padding: const EdgeInsets.all(16),
-                      child: Text('Alert List',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      ),
-                      Expanded(
-                          child: ListView.builder(
-                              itemCount:10, //temporary, shall be replaced with actual data
-                            itemBuilder: (context, index){
-                                return AlertListItem(
-                                  patientName: 'John Kelly',
-                                  alertType:'Emergency',
-                                  timestamp: '10m ago',
-                                  onPressed:(){
-                                    //handle Alert tap here
-                                  },
-                                );
-                            },
-                          ),
-                      ),
-                    ],
+            const SizedBox(height: 40),
+
+            // Schedule Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _scheduleReminder,
+                icon: const Icon(Icons.alarm_add),
+                label: const Text('Schedule Reminder'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-              ),
-              //Vertical Divider
-              VerticalDivider(
-                thickness: 1,
-                color: Colors.grey,
-              ),
-              //Alert Details Column
-              Expanded(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'Alert Details',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundImage: AssetImage('assets/patient_image.png'), //should add image from asset, better create asset folder
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'John Kelly',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    SizedBox(height: 16),
-                    Text('Description: Patient is having chest pain',
-                    style: TextStyle(fontSize: 16,
-                    color: Colors.grey),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Medical History: Hypertension, Type 2 diabetes',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    SizedBox(height: 24),
-                    //action Buttons
-                    Column(
-                      children: [
-                        ElevatedButton(
-                            onPressed: () {
-                          //Handle Acknowledge tap logic
-                              print('Alert acknowledged');
-                        },
-                            child: Text('Acknowledge'),
-                        ),
-                        SizedBox(height: 8),
-                        OutlinedButton(
-                            onPressed: () {
-                              //Handle resolve logic here
-                              print('Alert resolved');
-                            },
-                            child: Text('Resolve'),
-                        ),
-                        SizedBox(height: 16),
-                        TextField(
-                          decoration: InputDecoration(
-                            labelText: 'Resolution notes',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            OutlinedButton(onPressed: () {
-                              //Handle the assign logic
-                            },
-                                child:Text('Assign'),
-                            ),
-                            ElevatedButton(onPressed: () {
-                              //Handle escalate tap
-                              print('Alert escalated');
-                            },
-                              child: Text('Escalate'),
-                            )
-                          ],
-                        )
-                      ],
-                    )
-                  ],
+                  elevation: 5,
                 ),
               ),
-              //Bottom Navigation Bar
-              Align(
-                alignment: Alignment.bottomCenter,
-                child:  Container(
-                  height: 60,
-                  width: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withAlpha(128),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Padding(padding: const EdgeInsets.only(left: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Tamale Denis',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4
-                                  ),
-                                  color: Colors.red,
-                                  child: Text('EMERGENCY'),
-                                ),
-                                SizedBox(width:8),
-                                Text('Patient is experiencing ches pain,'),
-                              ],
-                            )
-                          ],
-                        ),
-                      ),
-                      Padding(padding: const EdgeInsets.only(right: 16.0),
-                      child: Text('BPAD 533721',
-                      style: TextStyle(fontSize: 16),
-                      ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),)
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

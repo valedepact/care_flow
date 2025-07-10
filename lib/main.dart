@@ -1,28 +1,23 @@
-import 'package:care_flow/screens/visit_schedule_page.dart';
 import 'package:flutter/material.dart';
-import 'package:care_flow/screens/home_page.dart';
+import 'package:care_flow/screens/dashboard_page.dart';
 
-void main(){
-  runApp(MyApp());
+void main() {
+  runApp(const MyApp());
 }
-class MyApp extends StatelessWidget{
+
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Care Flow',
-      initialRoute: '/',
-      routes: {
-        '/visitSchedule': (context)=> VisitSchedulePage(),
-      },
+      // Set DashboardPage as the initial screen of the application.
+      home: const DashboardPage(),
+
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(),
     );
   }
 }
-
-
-

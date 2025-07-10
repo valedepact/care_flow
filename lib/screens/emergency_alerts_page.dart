@@ -26,10 +26,10 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
       ),
       body: Center(
         child: Padding(
-            padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Card(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)
+                borderRadius: BorderRadius.circular(20)
             ),
             elevation: 5,
             child: SingleChildScrollView(
@@ -113,14 +113,14 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
                       Row(
                         children: [
                           Checkbox(value: true,//temporary value, add actual logic
-                              onChanged: (bool? value){//add actual logic
-                          },
-                          activeColor: Colors.blue,
+                            onChanged: (bool? value){//add actual logic
+                            },
+                            activeColor: Colors.blue,
                           ),
                           const Expanded(child: Text(
                             'Notify emergency contacts',
                             style: TextStyle(fontSize: 16),
-                            ),
+                          ),
                           ),
                         ],
                       ),
@@ -128,13 +128,13 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton(onPressed: _cancelAlert,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              side: const BorderSide(color: Colors.black),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8.0),
-                              ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            side: const BorderSide(color: Colors.black),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
                             ),
+                          ),
                           child: const Text(
                             'CANCEL ALERT',
                             style: TextStyle(
@@ -158,7 +158,7 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
     required IconData icon,
     required String text,
     required Color iconColor,
-}){
+  }){
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,10 +169,10 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
         ),
         const SizedBox(width: 10),
         Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 16),
-            ),
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 16),
+          ),
         ),
       ],
     );
