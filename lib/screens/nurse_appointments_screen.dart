@@ -3,46 +3,48 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/patient.dart'; // Import Patient model for AppointmentStatus
 
-class VisitSchedulePage extends StatefulWidget {
-  const VisitSchedulePage({super.key});
+class NurseAppointmentsScreen extends StatefulWidget {
+  const NurseAppointmentsScreen({super.key});
 
   @override
-  State<VisitSchedulePage> createState() => _VisitSchedulePageState();
+  State<NurseAppointmentsScreen> createState() => _NurseAppointmentsScreenState();
 }
 
-class _VisitSchedulePageState extends State<VisitSchedulePage> {
-  List<Appointment> _visits = []; // Renamed from _appointments to _visits for clarity
+class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
+  List<Appointment> _appointments = [];
   bool _isLoading = true;
   String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchVisits();
+    _fetchAppointments();
   }
 
-  Future<void> _fetchVisits() async {
+  Future<void> _fetchAppointments() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      // Fetch appointments that are 'upcoming' and order them by date/time
+      // Fetch all appointments.
+      // In a more advanced scenario, you might filter by:
+      // .where('assignedToId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+      // .where('dateTime', isGreaterThanOrEqualTo: DateTime.now())
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('appointments')
-          .where('status', isEqualTo: 'upcoming') // Filter for upcoming appointments
           .orderBy('dateTime', descending: false) // Order by date ascending
           .get();
 
-      List<Appointment> fetchedVisits = snapshot.docs.map((doc) {
+      List<Appointment> fetchedAppointments = snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        DateTime visitDateTime = (data['dateTime'] as Timestamp).toDate();
+        DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
 
         return Appointment(
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
-          dateTime: visitDateTime,
+          dateTime: appointmentDateTime,
           location: data['location'] ?? 'N/A',
           status: AppointmentStatus.values.firstWhere(
                 (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
@@ -58,15 +60,15 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
 
       if (mounted) {
         setState(() {
-          _visits = fetchedVisits;
+          _appointments = fetchedAppointments;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error fetching visits: $e');
+      print('Error fetching appointments: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error loading visits: $e';
+          _errorMessage = 'Error loading appointments: $e';
           _isLoading = false;
         });
       }
@@ -77,7 +79,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Visit Schedule'),
+        title: const Text('My Appointments'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 4,
@@ -95,15 +97,15 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
           ),
         ),
       )
-          : _visits.isEmpty
+          : _appointments.isEmpty
           ? const Center(
-        child: Text('No upcoming visits scheduled.'),
+        child: Text('No appointments found. Schedule a new one!'),
       )
           : ListView.builder(
         padding: const EdgeInsets.all(16.0),
-        itemCount: _visits.length,
+        itemCount: _appointments.length,
         itemBuilder: (context, index) {
-          final visit = _visits[index];
+          final appointment = _appointments[index];
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8.0),
             elevation: 2,
@@ -116,7 +118,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Patient: ${visit.patientName}',
+                    'Patient: ${appointment.patientName}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.primary,
@@ -124,19 +126,19 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Type: ${visit.type}',
+                    'Type: ${appointment.type}', // Assuming 'type' field in Appointment
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   Text(
-                    'Date: ${DateFormat('MMM d, yyyy').format(visit.dateTime)}',
+                    'Date: ${DateFormat('MMM d, yyyy').format(appointment.dateTime)}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   Text(
-                    'Time: ${DateFormat('h:mm a').format(visit.dateTime)}',
+                    'Time: ${DateFormat('h:mm a').format(appointment.dateTime)}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   Text(
-                    'Location: ${visit.location}',
+                    'Location: ${appointment.location}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
@@ -147,16 +149,16 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       Chip(
-                        label: Text(visit.status.name.toUpperCase()),
-                        backgroundColor: visit.statusColor,
+                        label: Text(appointment.status.name.toUpperCase()),
+                        backgroundColor: appointment.statusColor,
                         labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-                  if (visit.notes.isNotEmpty) ...[
+                  if (appointment.notes.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Notes: ${visit.notes}',
+                      'Notes: ${appointment.notes}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -165,10 +167,10 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                     alignment: Alignment.bottomRight,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // Handle viewing/editing visit details
-                        print('View/Edit Visit ID: ${visit.id}');
+                        // Handle viewing/editing appointment details
+                        print('View/Edit Appointment ID: ${appointment.id}');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Viewing details for visit ID: ${visit.id}')),
+                          SnackBar(content: Text('Viewing details for appointment ID: ${appointment.id}')),
                         );
                       },
                       icon: const Icon(Icons.info_outline),

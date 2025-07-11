@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:care_flow/screens/dashboard_page.dart'; // The welcome/landing page
-import 'package:care_flow/screens/nurse_dashboard_board.dart'; // Import Nurse/Caregiver Dashboard
-import 'package:care_flow/screens/patient_dashboard_page.dart'; // Import Patient Dashboard (will create this)
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
 
 class LoginCard extends StatefulWidget {
   const LoginCard({super.key});
@@ -11,84 +10,112 @@ class LoginCard extends StatefulWidget {
 }
 
 class _LoginCardState extends State<LoginCard> {
-  final TextEditingController _usernameController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>(); // For form validation
+
+  bool _isLoading = false; // To show a loading indicator
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      final String username = _usernameController.text.trim();
-      final String password = _passwordController.text.trim();
+      setState(() {
+        _isLoading = true; // Start loading
+      });
 
-      // --- Simulated Login Logic ---
-      // In a real application, you would send these credentials to an authentication service
-      // (e.g., Firebase Auth, your custom backend API) and receive the user's role.
+      try {
+        // Attempt to sign in with email and password
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      // For demonstration:
-      if (username == 'patient' && password == 'password') {
-        print('Logging in as Patient');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PatientDashboardPage()),
-        );
-      } else if (username == 'nurse' && password == 'password') {
-        print('Logging in as Nurse');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const CaregiverDashboard()), // Nurse Dashboard
-        );
-      } else {
-        // Show an error message for invalid credentials
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid username or password. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        print('Login failed: Invalid credentials');
+        // If successful, navigate to the RoleRouterScreen
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'user-not-found') {
+          message = 'No user found for that email.';
+        } else if (e.code == 'wrong-password') {
+          message = 'Wrong password provided for that user.';
+        } else if (e.code == 'invalid-email') {
+          message = 'The email address is not valid.';
+        } else {
+          message = 'Login failed: ${e.message}';
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('An unexpected error occurred: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false; // Stop loading
+          });
+        }
       }
-      // --- End Simulated Login Logic ---
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4, // Added elevation for better visual separation
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Rounded corners
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(24.0), // Increased padding
-        child: Form( // Wrapped with Form for validation
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
           key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Make column take minimum space
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "Login into your account",
+                "Login to Your Account",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 24), // Increased spacing
+              const SizedBox(height: 24),
 
               TextFormField(
-                controller: _usernameController,
+                controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: "Username or email",
+                  labelText: "Email",
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                  prefixIcon: Icon(Icons.email),
                 ),
+                keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your username or email';
+                    return 'Please enter your email';
+                  }
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                    return 'Please enter a valid email address';
                   }
                   return null;
                 },
@@ -112,7 +139,24 @@ class _LoginCardState extends State<LoginCard> {
               ),
               const SizedBox(height: 16),
 
-              ElevatedButton(
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    // Handle forgot password logic
+                    print('Forgot Password pressed');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Forgot password functionality coming soon!')),
+                    );
+                  },
+                  child: const Text("Forgot Password?"),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              _isLoading
+                  ? const CircularProgressIndicator() // Show loading indicator
+                  : ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
@@ -123,17 +167,8 @@ class _LoginCardState extends State<LoginCard> {
                   ),
                   elevation: 5,
                 ),
+                onPressed: _login,
                 child: const Text("Login"),
-                onPressed: _login, // Call the _login function
-              ),
-              const SizedBox(height: 8),
-
-              TextButton(
-                child: const Text("Forgot Password?"),
-                onPressed: () {
-                  // Forgot password logic will lie here
-                  print('Forgot Password pressed');
-                },
               ),
             ],
           ),

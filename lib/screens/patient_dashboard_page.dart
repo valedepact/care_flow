@@ -1,21 +1,180 @@
 import 'package:flutter/material.dart';
-import 'package:care_flow/screens/emergency_alerts_page.dart'; // Import the EmergencyAlertsPage
-import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage
-import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:care_flow/screens/emergency_alerts_page.dart';
+import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
+import 'package:care_flow/screens/my_alerts_screen.dart'; // Import the new MyAlertsScreen (for viewing)
+import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
+import 'package:care_flow/models/patient.dart'; // Import the Patient model (contains Appointment model)
+import 'package:intl/intl.dart'; // For date formatting
 
-class PatientDashboardPage extends StatelessWidget {
+class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
+
+  @override
+  State<PatientDashboardPage> createState() => _PatientDashboardPageState();
+}
+
+class _PatientDashboardPageState extends State<PatientDashboardPage> {
+  String _patientName = 'Loading...';
+  String _patientId = '';
+  bool _isLoading = true;
+  Appointment? _upcomingAppointment; // To store the fetched upcoming appointment
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPatientData();
+  }
+
+  Future<void> _fetchPatientData() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            _patientName = userDoc.get('fullName') ?? 'Patient';
+            _patientId = currentUser.uid;
+          });
+          await _fetchUpcomingAppointment(currentUser.uid); // Fetch upcoming appointment
+        } else {
+          print('Patient document not found for UID: ${currentUser.uid}');
+          setState(() {
+            _patientName = 'Patient (Profile Incomplete)';
+            _patientId = currentUser.uid;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        print('Error fetching patient data: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading patient data: $e')),
+          );
+          setState(() {
+            _patientName = 'Error Loading';
+            _isLoading = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+              (route) => false,
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchUpcomingAppointment(String patientId) async {
+    try {
+      QuerySnapshot appointmentSnapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('patientId', isEqualTo: patientId)
+          .where('dateTime', isGreaterThanOrEqualTo: DateTime.now())
+          .orderBy('dateTime')
+          .limit(1)
+          .get();
+
+      if (appointmentSnapshot.docs.isNotEmpty) {
+        DocumentSnapshot appointmentDoc = appointmentSnapshot.docs.first;
+        Map<String, dynamic> data = appointmentDoc.data() as Map<String, dynamic>;
+
+        DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+
+        setState(() {
+          _upcomingAppointment = Appointment(
+            id: appointmentDoc.id,
+            patientId: data['patientId'],
+            patientName: data['patientName'],
+            dateTime: appointmentDateTime,
+            location: data['location'] ?? 'N/A',
+            status: AppointmentStatus.values.firstWhere(
+                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+              orElse: () => AppointmentStatus.upcoming,
+            ),
+            notes: data['notes'] ?? '',
+            statusColor: Appointment.getColorForStatus(AppointmentStatus.values.firstWhere(
+                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+              orElse: () => AppointmentStatus.upcoming,
+            )),
+          );
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _upcomingAppointment = null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching upcoming appointment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading upcoming appointment: $e')),
+        );
+        setState(() {
+          _upcomingAppointment = null;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      print('Error during logout: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging out: $e')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Patient Dashboard'),
-        backgroundColor: Colors.blueAccent, // A distinct color for the patient dashboard
-        elevation: 4, // Add a subtle shadow
+        backgroundColor: Colors.blueAccent,
+        elevation: 4,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Logout',
+          ),
+        ],
       ),
-      body: Center(
-        child: SingleChildScrollView( // Added SingleChildScrollView for responsiveness
+      body: _isLoading
+          ? const Center(
+        child: CircularProgressIndicator(),
+      )
+          : Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -31,7 +190,7 @@ class PatientDashboardPage extends StatelessWidget {
 
               // Welcome Message
               Text(
-                'Welcome, Patient!',
+                'Welcome, $_patientName!',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
@@ -51,8 +210,8 @@ class PatientDashboardPage extends StatelessWidget {
 
               // Quick Actions/Navigation Buttons
               Wrap(
-                spacing: 16.0, // Horizontal spacing
-                runSpacing: 16.0, // Vertical spacing
+                spacing: 16.0,
+                runSpacing: 16.0,
                 alignment: WrapAlignment.center,
                 children: [
                   _buildDashboardButton(
@@ -60,7 +219,6 @@ class PatientDashboardPage extends StatelessWidget {
                     icon: Icons.calendar_today,
                     label: 'My Appointments',
                     onPressed: () {
-                      // Navigate to appointments page
                       print('My Appointments pressed');
                     },
                   ),
@@ -69,7 +227,6 @@ class PatientDashboardPage extends StatelessWidget {
                     icon: Icons.folder_open,
                     label: 'Medical Records',
                     onPressed: () {
-                      // Navigate to medical records page
                       print('Medical Records pressed');
                     },
                   ),
@@ -78,12 +235,7 @@ class PatientDashboardPage extends StatelessWidget {
                     icon: Icons.message,
                     label: 'Messages',
                     onPressed: () {
-                      // Navigate to the ChatListPage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ChatListPage()),
-                      );
-                      print('Messages pressed - Navigating to chat list');
+                      print('Messages pressed');
                     },
                   ),
                   _buildDashboardButton(
@@ -91,26 +243,22 @@ class PatientDashboardPage extends StatelessWidget {
                     icon: Icons.medication,
                     label: 'Prescriptions',
                     onPressed: () {
-                      // Navigate to prescriptions page
                       print('Prescriptions pressed');
                     },
                   ),
-                  // New Button: Emergency Alert
                   _buildDashboardButton(
                     context,
                     icon: Icons.notifications_active,
                     label: 'Emergency Alert',
                     onPressed: () {
-                      // Navigate to Emergency Alerts Page
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const EmergencyAlertsPage()),
                       );
                       print('Emergency Alert pressed');
                     },
-                    color: Colors.red.shade700, // Make it stand out
+                    color: Colors.red.shade700,
                   ),
-                  // New Button: Set Personal Reminder
                   _buildDashboardButton(
                     context,
                     icon: Icons.add_alarm,
@@ -122,13 +270,27 @@ class PatientDashboardPage extends StatelessWidget {
                       );
                       print('Set Reminder pressed from Patient Dashboard');
                     },
-                    color: Colors.teal, // A distinct color
+                    color: Colors.teal,
+                  ),
+                  // New: My Alerts button for patients
+                  _buildDashboardButton(
+                    context,
+                    icon: Icons.list_alt, // Icon for a list/alerts
+                    label: 'My Alerts',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MyAlertsScreen()),
+                      );
+                      print('My Alerts pressed from Patient Dashboard');
+                    },
+                    color: Colors.deepPurple, // A distinct color
                   ),
                 ],
               ),
               const SizedBox(height: 40),
 
-              // Placeholder for recent activity or next appointment
+              // Upcoming Appointment Card (Dynamic)
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -145,45 +307,58 @@ class PatientDashboardPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 15),
-                      Row(
-                        children: [
-                          const Icon(Icons.event, color: Colors.grey, size: 24),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Dr. Smith - Cardiology',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time, color: Colors.grey, size: 24),
-                          const SizedBox(width: 10),
-                          Text(
-                            'July 15, 2025 at 10:00 AM',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            print('View Appointment Details pressed');
-                          },
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('View Details'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                      if (_upcomingAppointment != null) ...[
+                        Row(
+                          children: [
+                            const Icon(Icons.event, color: Colors.grey, size: 24),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${_upcomingAppointment!.patientName} - ${_upcomingAppointment!.location}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time, color: Colors.grey, size: 24),
+                            const SizedBox(width: 10),
+                            Text(
+                              DateFormat('MMM d, yyyy - h:mm a').format(_upcomingAppointment!.dateTime),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              print('View Appointment Details pressed for ID: ${_upcomingAppointment!.id}');
+                            },
+                            icon: const Icon(Icons.arrow_forward),
+                            label: const Text('View Details'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            'No upcoming appointments found.',
+                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -200,15 +375,15 @@ class PatientDashboardPage extends StatelessWidget {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
-    Color? color, // Added optional color parameter
+    Color? color,
   }) {
     return SizedBox(
-      width: 150, // Fixed width for consistent button size
+      width: 150,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: color ?? Theme.of(context).colorScheme.surfaceVariant, // Use provided color or default
-          foregroundColor: color != null ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant, // Adjust foreground color based on background
+          backgroundColor: color ?? Theme.of(context).colorScheme.surfaceVariant,
+          foregroundColor: color != null ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
           padding: const EdgeInsets.symmetric(vertical: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

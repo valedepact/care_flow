@@ -2,28 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 
-class AddPatientScreen extends StatefulWidget {
-  const AddPatientScreen({super.key});
+class EditPatientScreen extends StatefulWidget {
+  final Patient patient; // The patient object to be edited
+
+  const EditPatientScreen({super.key, required this.patient});
 
   @override
-  State<AddPatientScreen> createState() => _AddPatientScreenState();
+  State<EditPatientScreen> createState() => _EditPatientScreenState();
 }
 
-class _AddPatientScreenState extends State<AddPatientScreen> {
+class _EditPatientScreenState extends State<EditPatientScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _dateOfBirthController = TextEditingController();
-  final TextEditingController _contactNumberController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _conditionController = TextEditingController();
-  final TextEditingController _emergencyContactNameController = TextEditingController();
-  final TextEditingController _emergencyContactNumberController = TextEditingController();
+  late TextEditingController _fullNameController;
+  late TextEditingController _dateOfBirthController;
+  late TextEditingController _contactNumberController;
+  late TextEditingController _emailController;
+  late TextEditingController _addressController;
+  late TextEditingController _conditionController;
+  late TextEditingController _medicationsController;
+  late TextEditingController _treatmentHistoryController;
+  late TextEditingController _notesController;
+  late TextEditingController _lastVisitController;
+  late TextEditingController _emergencyContactNameController;
+  late TextEditingController _emergencyContactNumberController;
 
   String? _selectedGender;
   bool _isLoading = false; // To show a loading indicator
 
   final List<String> _genders = ['Male', 'Female', 'Other'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controllers with existing patient data
+    _fullNameController = TextEditingController(text: widget.patient.name);
+    _dateOfBirthController = TextEditingController(text: widget.patient.age);
+    _contactNumberController = TextEditingController(text: widget.patient.contact);
+    _emailController = TextEditingController(text: widget.patient.email); // Use actual email if available
+    _addressController = TextEditingController(text: widget.patient.address);
+    _conditionController = TextEditingController(text: widget.patient.condition);
+    _medicationsController = TextEditingController(text: widget.patient.medications.join(', '));
+    _treatmentHistoryController = TextEditingController(text: widget.patient.treatmentHistory.join(', '));
+    _notesController = TextEditingController(text: widget.patient.notes.join('\n'));
+    _lastVisitController = TextEditingController(text: widget.patient.lastVisit);
+    _emergencyContactNameController = TextEditingController(text: widget.patient.emergencyContactName);
+    _emergencyContactNumberController = TextEditingController(text: widget.patient.emergencyContactNumber);
+
+    _selectedGender = widget.patient.gender;
+  }
 
   @override
   void dispose() {
@@ -33,6 +59,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     _emailController.dispose();
     _addressController.dispose();
     _conditionController.dispose();
+    _medicationsController.dispose();
+    _treatmentHistoryController.dispose();
+    _notesController.dispose();
+    _lastVisitController.dispose();
     _emergencyContactNameController.dispose();
     _emergencyContactNumberController.dispose();
     super.dispose();
@@ -41,7 +71,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   Future<void> _selectDateOfBirth(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)), // Default to 20 years ago
+      initialDate: DateTime.tryParse(_dateOfBirthController.text) ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
@@ -52,64 +82,52 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     }
   }
 
-  Future<void> _addPatient() async {
+  Future<void> _updatePatient() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true; // Start loading
       });
 
       try {
-        // Create a map of patient data to save to Firestore
-        Map<String, dynamic> patientData = {
+        // Create a map of updated patient data
+        Map<String, dynamic> updatedData = {
           'name': _fullNameController.text.trim(),
-          'age': _dateOfBirthController.text.trim(), // Storing DOB as age string for now
+          'age': _dateOfBirthController.text.trim(),
           'gender': _selectedGender ?? 'N/A',
           'contact': _contactNumberController.text.trim(),
           'email': _emailController.text.trim(),
           'address': _addressController.text.trim(),
           'condition': _conditionController.text.trim(),
-          'medications': [], // Placeholder, can be updated later
-          'treatmentHistory': [], // Placeholder, can be updated later
-          'notes': [], // Placeholder, can be updated later
-          'imageUrls': [], // Placeholder, can be updated later
-          'lastVisit': 'N/A', // Placeholder, can be updated later
-          'nextAppointmentId': null, // Placeholder, can be updated later
+          'medications': _medicationsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+          'treatmentHistory': _treatmentHistoryController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+          'notes': _notesController.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+          'lastVisit': _lastVisitController.text.trim(),
           'emergencyContactName': _emergencyContactNameController.text.trim(),
           'emergencyContactNumber': _emergencyContactNumberController.text.trim(),
-          'createdAt': FieldValue.serverTimestamp(), // Add a timestamp
+          'updatedAt': FieldValue.serverTimestamp(), // Add an update timestamp
         };
 
-        // Add the patient data to the 'patients' collection in Firestore
-        await FirebaseFirestore.instance.collection('patients').add(patientData);
+        // Update the patient document in Firestore using its ID
+        await FirebaseFirestore.instance
+            .collection('patients')
+            .doc(widget.patient.id) // Use the existing patient's ID
+            .update(updatedData);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Patient ${_fullNameController.text} added successfully!'),
+              content: Text('Patient ${widget.patient.name} updated successfully!'),
               backgroundColor: Colors.green,
             ),
           );
-          // Optionally clear fields after adding
-          _fullNameController.clear();
-          _dateOfBirthController.clear();
-          _contactNumberController.clear();
-          _emailController.clear();
-          _addressController.clear();
-          _conditionController.clear();
-          _emergencyContactNameController.clear();
-          _emergencyContactNumberController.clear();
-          setState(() {
-            _selectedGender = null;
-          });
-          // You might want to pop the screen or navigate back to the patient list
-          // Navigator.pop(context);
+          Navigator.pop(context); // Go back to the patient profile page
         }
       } catch (e) {
-        print('Error adding patient: $e');
+        print('Error updating patient: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to add patient: $e'),
+              content: Text('Failed to update patient: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -128,7 +146,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add New Patient'),
+        title: Text('Edit ${widget.patient.name}\'s Profile'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
@@ -148,7 +166,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Full Name
               TextFormField(
                 controller: _fullNameController,
                 decoration: const InputDecoration(
@@ -165,7 +182,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Date of Birth
               InkWell(
                 onTap: () => _selectDateOfBirth(context),
                 child: InputDecorator(
@@ -184,7 +200,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Gender Selection
               DropdownButtonFormField<String>(
                 value: _selectedGender,
                 hint: const Text('Select Gender'),
@@ -203,11 +218,9 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                     _selectedGender = newValue;
                   });
                 },
-                validator: (value) => value == null ? 'Please select gender' : null,
               ),
               const SizedBox(height: 16),
 
-              // Contact Number
               TextFormField(
                 controller: _contactNumberController,
                 decoration: const InputDecoration(
@@ -216,16 +229,9 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter contact number';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
 
-              // Email
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
@@ -237,7 +243,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Address
               TextFormField(
                 controller: _addressController,
                 decoration: const InputDecoration(
@@ -246,25 +251,59 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   prefixIcon: Icon(Icons.home),
                 ),
                 maxLines: 2,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter address';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
 
-              // Condition
               TextFormField(
                 controller: _conditionController,
                 decoration: const InputDecoration(
-                  labelText: 'Condition (e.g., Diabetes, Hypertension)',
-                  hintText: 'e.g., "Type 2 Diabetes"',
+                  labelText: 'Condition',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.medical_services),
                 ),
-                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _medicationsController,
+                decoration: const InputDecoration(
+                  labelText: 'Medications (comma-separated)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.medication),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _treatmentHistoryController,
+                decoration: const InputDecoration(
+                  labelText: 'Treatment History (comma-separated)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.history),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (e.g., nurse updates)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.notes),
+                ),
+                maxLines: 5,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _lastVisitController,
+                decoration: const InputDecoration(
+                  labelText: 'Last Visit Date',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.event),
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -299,15 +338,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Add Patient Button
               SizedBox(
                 width: double.infinity,
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton.icon(
-                  onPressed: _addPatient,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Add Patient'),
+                  onPressed: _updatePatient,
+                  icon: const Icon(Icons.save),
+                  label: const Text('Save Changes'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,

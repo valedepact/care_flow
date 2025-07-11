@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "485399308801",
+    "project_id": "care-flow-bc527",
+    "storage_bucket": "care-flow-bc527.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:485399308801:android:2354d754e3ae8e0c56ee00",
+        "android_client_info": {
+          "package_name": "com.example.care_flow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvJzV3T2NdXZPg_BD32kWjs8j6I9liVDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,85 +1,106 @@
 import 'package:flutter/material.dart';
-import 'package:care_flow/screens/dashboard_page.dart'; // Assuming DashboardPage is the next screen after registration
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
 
-class RegisterCard extends StatefulWidget { // Changed to StatefulWidget to manage dropdown value
-  const RegisterCard({super.key});
+class LoginCard extends StatefulWidget {
+  const LoginCard({super.key});
 
   @override
-  State<RegisterCard> createState() => _RegisterCardState();
+  State<LoginCard> createState() => _LoginCardState();
 }
 
-class _RegisterCardState extends State<RegisterCard> {
-  final _formKey = GlobalKey<FormState>(); // Added a GlobalKey for form validation
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
+class _LoginCardState extends State<LoginCard> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
 
-  String _selectedRole = "Patient"; // Default role changed to Patient
+  bool _isLoading = false; // To show a loading indicator
 
   @override
   void dispose() {
-    _fullNameController.dispose();
-    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true; // Start loading
+      });
+
+      try {
+        // Attempt to sign in with email and password
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        // If successful, navigate to the RoleRouterScreen
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'user-not-found') {
+          message = 'No user found for that email.';
+        } else if (e.code == 'wrong-password') {
+          message = 'Wrong password provided for that user.';
+        } else if (e.code == 'invalid-email') {
+          message = 'The email address is not valid.';
+        } else {
+          message = 'Login failed: ${e.message}';
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('An unexpected error occurred: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false; // Stop loading
+          });
+        }
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4, // Added elevation for better visual separation
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Rounded corners
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(24.0), // Increased padding
-        child: Form( // Wrapped with Form for validation
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
           key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Make column take minimum space
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "Create a New Account",
+                "Login to Your Account",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 24), // Increased spacing
-
-              TextFormField(
-                controller: _fullNameController,
-                decoration: const InputDecoration(
-                  labelText: "Full Name",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your full name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: "Username",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.account_circle),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a username';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
               TextFormField(
                 controller: _emailController,
@@ -111,58 +132,31 @@ class _RegisterCardState extends State<RegisterCard> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a password';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters long';
+                    return 'Please enter your password';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              TextFormField(
-                controller: _confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Confirm Password",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_reset),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    // Handle forgot password logic
+                    print('Forgot Password pressed');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Forgot password functionality coming soon!')),
+                    );
+                  },
+                  child: const Text("Forgot Password?"),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please confirm your password';
-                  }
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              // Role Selection Dropdown
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: "Register as", // Changed label for clarity
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.badge),
-                ),
-                value: _selectedRole,
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedRole = newValue!;
-                  });
-                },
-                items: const [
-                  DropdownMenuItem(value: "Patient", child: Text("Patient")),
-                  DropdownMenuItem(value: "Nurse", child: Text("Nurse")),
-                  DropdownMenuItem(value: "Doctor", child: Text("Doctor")),
-                ],
-              ),
-              const SizedBox(height: 24), // Increased spacing
-
-              ElevatedButton(
+              _isLoading
+                  ? const CircularProgressIndicator() // Show loading indicator
+                  : ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
@@ -173,24 +167,8 @@ class _RegisterCardState extends State<RegisterCard> {
                   ),
                   elevation: 5,
                 ),
-                child: const Text("Register"),
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // All fields are valid, proceed with registration logic
-                    print('Registration successful for role: $_selectedRole');
-                    print('Full Name: ${_fullNameController.text}');
-                    print('Username: ${_usernameController.text}');
-                    print('Email: ${_emailController.text}');
-                    // In a real app, you would send this data to your backend
-                    // for user creation and authentication.
-
-                    // Navigate to DashboardPage after successful registration
-                    Navigator.pushReplacement( // Use pushReplacement to prevent going back to register page
-                      context,
-                      MaterialPageRoute(builder: (context) => const DashboardPage()),
-                    );
-                  }
-                },
+                onPressed: _login,
+                child: const Text("Login"),
               ),
             ],
           ),
