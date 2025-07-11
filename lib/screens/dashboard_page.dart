@@ -1,3 +1,8 @@
+import 'package:care_flow/screens/alert_page.dart';
+import 'package:care_flow/screens/emergency_alerts_page.dart';
+import 'package:care_flow/screens/login_page.dart';
+import 'package:care_flow/screens/nurse_dashboard_board.dart';
+import 'package:care_flow/screens/visit_schedule_page.dart';
 import 'package:flutter/material.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -8,8 +13,48 @@ class DashboardPage extends StatelessWidget {
       appBar:AppBar(
         title: Text("Care Flow Dashboard"),
       ),
-      body:Center(
-        child: Text("Welcome to Care Flow!"),
+      body: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(child: LoginCard()),
+          SizedBox(width: 16),
+          Expanded(child: ElevatedButton(child: Text('Visit Schedule'),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => VisitSchedulePage()),
+            );
+          },
+          ),
+          ),
+          Expanded(child: ElevatedButton(child: Text('Alerts'),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AlertsPage()),
+              );
+            },
+          ),
+          ),
+          Expanded(child: ElevatedButton(child: Text('Emergency'),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => EmergencyAlertsPage()),
+              );
+            },
+          ),
+          ),
+          Expanded(child: ElevatedButton(child: Text('Care giver Dashboard'),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CaregiverDashboard()),
+              );
+            },
+          ),
+          ),
+        ],
       ),
     );
   }

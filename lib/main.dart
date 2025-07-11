@@ -1,3 +1,4 @@
+messaging_page
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'firebase_options.dart';
+
+import 'package:care_flow/screens/visit_schedule_page.dart';
+import 'package:flutter/material.dart';
+import 'package:care_flow/screens/home_page.dart'; main
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +30,15 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+
       title: 'Chats',
+
+      title: 'Care Flow',
+      initialRoute: '/',
+      routes: {
+        '/visitSchedule': (context)=> VisitSchedulePage(),
+      },
+
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -35,6 +48,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key});
@@ -375,3 +389,5 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+
