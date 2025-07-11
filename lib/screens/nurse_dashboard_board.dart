@@ -3,7 +3,8 @@ import 'package:care_flow/screens/visit_schedule_page.dart';
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage
 import 'package:care_flow/screens/add_appointment_screen.dart'; // Import the AddAppointmentScreen
 import 'package:care_flow/screens/add_patient_screen.dart'; // Import the AddPatientScreen
-import 'package:care_flow/screens/patient_profile_page.dart'; // Import the new PatientProfilePage
+import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
+import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -20,8 +21,6 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
       _selectedIndex = index;
     });
     // Optional: Add specific navigation logic for bottom navigation bar items if needed.
-    // For example, if index 2 is the 'Schedule' tab, you could navigate directly.
-    // However, the "View All" button below provides explicit navigation to VisitSchedulePage.
   }
 
   @override
@@ -205,6 +204,19 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                         print('Schedule Reminder button pressed');
                       },
                       color: Colors.blueGrey, // A distinct color
+                    ),
+                    // New: Messages Quick Action Button for Nurse Dashboard
+                    QuickActionButton(
+                      label: 'Messages',
+                      icon: Icons.message,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ChatListPage()),
+                        );
+                        print('Messages button pressed from Nurse Dashboard');
+                      },
+                      color: Colors.indigo, // A distinct color for messages
                     ),
                   ],
                 ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:care_flow/screens/emergency_alerts_page.dart'; // Import the EmergencyAlertsPage
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage
+import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
 
 class PatientDashboardPage extends StatelessWidget {
   const PatientDashboardPage({super.key});
@@ -77,8 +78,12 @@ class PatientDashboardPage extends StatelessWidget {
                     icon: Icons.message,
                     label: 'Messages',
                     onPressed: () {
-                      // Navigate to messages page
-                      print('Messages pressed');
+                      // Navigate to the ChatListPage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ChatListPage()),
+                      );
+                      print('Messages pressed - Navigating to chat list');
                     },
                   ),
                   _buildDashboardButton(
