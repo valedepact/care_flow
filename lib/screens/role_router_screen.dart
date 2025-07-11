@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // For authentication state changes
 import 'package:cloud_firestore/cloud_firestore.dart'; // For fetching user role from Firestore
 
-import 'package:care_flow/screens/homepage.dart'; // Your login/register page
+import 'package:care_flow/screens/homepage.dart'; // Import your MyHomePage
 import 'package:care_flow/screens/patient_dashboard_page.dart'; // Patient's dashboard
-import 'package:care_flow/screens/nurse_dashboard_page.dart'; // Nurse's dashboard (CaregiverDashboard)
+import 'package:care_flow/screens/nurse_dashboard_board.dart'; // Nurse's dashboard (CaregiverDashboard)
 
 class RoleRouterScreen extends StatefulWidget {
   const RoleRouterScreen({super.key});
@@ -28,7 +28,7 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const MyHomePage()),
+            MaterialPageRoute(builder: (context) => const MyHomePage()), // Correctly refers to MyHomePage
                 (route) => false, // Remove all previous routes
           );
         }
@@ -53,12 +53,12 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
               } else if (role == 'Nurse') {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const CaregiverDashboard()),
+                  MaterialPageRoute(builder: (context) => const CaregiverDashboard()), // Correctly refers to CaregiverDashboard
                       (route) => false,
                 );
               } else {
                 // Handle unknown role or no role found
-                print('Unknown role or role not set for user: ${user.uid}');
+                debugPrint('Unknown role or role not set for user: ${user.uid}');
                 // Optionally sign out and go to login page
                 await FirebaseAuth.instance.signOut();
                 if (mounted) {
@@ -72,7 +72,7 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
             }
           } else {
             // User document does not exist in Firestore (e.g., deleted manually)
-            print('User document not found for UID: ${user.uid}');
+            debugPrint('User document not found for UID: ${user.uid}');
             await FirebaseAuth.instance.signOut(); // Sign out the invalid user
             if (mounted) {
               Navigator.pushAndRemoveUntil(
@@ -83,7 +83,7 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
             }
           }
         } catch (e) {
-          print('Error fetching user role: $e');
+          debugPrint('Error fetching user role: $e');
           // In case of error, sign out and go to login page
           await FirebaseAuth.instance.signOut();
           if (mounted) {

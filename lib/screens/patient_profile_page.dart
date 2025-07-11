@@ -1,33 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:care_flow/screens/edit_patient_screen.dart'; // Import the EditPatientScreen
-import 'package:care_flow/screens/patient_medical_records_screen.dart'; // Import PatientMedicalRecordsScreen
-import 'package:care_flow/screens/patient_prescriptions_screen.dart';
-import 'package:care_flow/screens/patient_notes_screen.dart';
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:care_flow/screens/edit_patient_screen.dart'; // Import EditPatientScreen
+import 'package:care_flow/screens/patient_medical_records_screen.dart'; // Import MedicalRecordsScreen
+import 'package:care_flow/screens/prescriptions_page.dart'; // Import PrescriptionsPage
+import 'package:care_flow/screens/patient_notes_screen.dart'; // Import PatientNotesScreen
+// For debugPrint
 
 class PatientProfilePage extends StatefulWidget {
-  final String patientId; // Now expects a patient ID
-  final String patientName; // Keep patientName for initial display while loading
+  final String patientId; // Required patientId
+  final String patientName; // For display purposes (initial load)
 
-  const PatientProfilePage({super.key, required this.patientId, required this.patientName});
+  const PatientProfilePage({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+  });
 
   @override
   State<PatientProfilePage> createState() => _PatientProfilePageState();
 }
 
 class _PatientProfilePageState extends State<PatientProfilePage> {
-  Patient? _currentPatient; // Nullable Patient object
+  Patient? _patient;
   bool _isLoading = true;
   String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchPatientData();
+    _fetchPatientDetails();
   }
 
-  Future<void> _fetchPatientData() async {
+  // Fetches patient details from Firestore using the provided patientId
+  Future<void> _fetchPatientDetails() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -38,23 +44,29 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           .doc(widget.patientId)
           .get();
 
-      if (doc.exists && doc.data() != null) {
-        setState(() {
-          _currentPatient = Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
-          _isLoading = false;
-        });
+      if (doc.exists) {
+        if (mounted) {
+          setState(() {
+            _patient = Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+            _isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Patient with ID ${widget.patientId} not found.';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching patient details: $e');
+      if (mounted) {
         setState(() {
-          _errorMessage = 'Patient data not found for ID: ${widget.patientId}';
+          _errorMessage = 'Error loading patient details: $e';
           _isLoading = false;
         });
       }
-    } catch (e) {
-      print('Error fetching patient data: $e');
-      setState(() {
-        _errorMessage = 'Error loading patient data: $e';
-        _isLoading = false;
-      });
     }
   }
 
@@ -62,10 +74,28 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${_currentPatient?.name ?? widget.patientName}\'s Profile'),
-        centerTitle: true,
-        backgroundColor: Colors.teal[700],
+        title: Text(_patient?.name ?? widget.patientName), // Use fetched name or initial name
+        backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
+        elevation: 4,
+        actions: [
+          if (_patient != null)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                // Navigate to EditPatientScreen
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditPatientScreen(patient: _patient!),
+                  ),
+                );
+                // Refresh patient details after returning from edit screen
+                _fetchPatientDetails();
+              },
+              tooltip: 'Edit Patient',
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -80,307 +110,236 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           ),
         ),
       )
-          : Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            child: Column(
-              children: [
-                _buildProfileHeader(context, _currentPatient!),
-                const SizedBox(height: 16),
-                _buildSectionCard(
-                  context: context,
-                  title: '1. Personal & Demographic Information',
-                  items: [
-                    _infoRow(context, 'Full Name', _currentPatient!.name),
-                    _infoRow(context, 'Age', _currentPatient!.age),
-                    _infoRow(context, 'Gender', _currentPatient!.gender),
-                    _infoRow(context, 'Contact', _currentPatient!.contact),
-                    _infoRow(context, 'Insurance', 'Jubilee Health Plan'), // Hardcoded
-                    _infoRow(context, 'Address', _currentPatient!.address),
-                    _infoRow(context, 'Emergency Contact', '${_currentPatient!.emergencyContactName ?? 'N/A'} - ${_currentPatient!.emergencyContactNumber ?? 'N/A'}'),
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '2. Medical History',
-                  items: [
-                    _infoRow(context, 'Condition', _currentPatient!.condition),
-                    _infoRow(context, 'Treatment History', _currentPatient!.treatmentHistory.join(', ')),
-                    _infoRow(context, 'Past Illnesses', 'Asthma, Hypertension'), // Hardcoded
-                    _infoRow(context, 'Surgeries', 'Appendectomy - 2018'), // Hardcoded
-                    _infoRow(context, 'Immunizations', 'COVID-19, Tetanus'), // Hardcoded
-                    _infoRow(context, 'Family History', 'Diabetes (Mother)'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '3. Medications',
-                  items: [
-                    _infoRow(context, 'Current Medications', _currentPatient!.medications.join(', ')),
-                    _infoRow(context, 'OTC Drugs', 'Paracetamol'), // Hardcoded
-                    _infoRow(context, 'Supplements', 'Vitamin D'), // Hardcoded
-                    _infoRow(context, 'Allergies', 'Penicillin'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '4. Vital Signs',
-                  items: [
-                    _infoRow(context, 'Blood Pressure', '120/80 mmHg'), // Hardcoded
-                    _infoRow(context, 'Heart Rate', '75 bpm'), // Hardcoded
-                    _infoRow(context, 'Temperature', '36.8°C'), // Hardcoded
-                    _infoRow(context, 'Respiratory Rate', '16 breaths/min'), // Hardcoded
-                    _infoRow(context, 'Oxygen Saturation', '98%'), // Hardcoded
-                    _infoRow(context, 'Weight & Height', '65 kg / 170 cm (BMI: 22.5)'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '5. Lab & Test Results',
-                  items: [
-                    _infoRow(context, 'Blood Tests', 'CBC: Normal, Sugar: 5.5 mmol/L'), // Hardcoded
-                    _infoRow(context, 'Imaging', 'Chest X-ray: Clear'), // Hardcoded
-                    _infoRow(context, 'ECG', 'Normal sinus rhythm'), // Hardcoded
-                    _infoRow(context, 'Biopsy Reports', 'N/A'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '6. Recent Visit Notes',
-                  items: [
-                    _infoRow(context, 'Last Visit Date', _currentPatient!.lastVisit),
-                    _infoRow(context, 'Notes', _currentPatient!.notes.join('\n')),
-                    _infoRow(context, 'Symptoms', 'Shortness of breath, fatigue'), // Hardcoded
-                    _infoRow(context, 'Physical Exam', 'Lungs clear, BP stable'), // Hardcoded
-                    _infoRow(context, 'Diagnosis', 'Mild asthma attack'), // Hardcoded
-                    _infoRow(context, 'Treatment', 'Inhaler, Rest'), // Hardcoded
-                    _infoRow(context, 'Doctor\'s Notes', 'Follow-up in 2 weeks'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '7. Mental & Social Health',
-                  items: [
-                    _infoRow(context, 'Mental Health', 'Mild anxiety'), // Hardcoded
-                    _infoRow(context, 'Lifestyle', 'Non-smoker, Occasional alcohol'), // Hardcoded
-                    _infoRow(context, 'Support System', 'Lives with spouse, 2 kids'), // Hardcoded
-                    _infoRow(context, 'Occupation', 'Teacher, moderate stress'), // Hardcoded
-                  ],
-                ),
-                _buildSectionCard(
-                  context: context,
-                  title: '8. Progress Notes',
-                  items: [
-                    _infoRow(context, 'Response to Treatment', 'Improving, less wheezing'), // Hardcoded
-                    _infoRow(context, 'Next Visit', '10 July 2025'), // Hardcoded
-                    _infoRow(context, 'Complications', 'None'), // Hardcoded
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Nurse-specific action buttons for patient profile
-                Wrap(
-                  spacing: 12.0,
-                  runSpacing: 12.0,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditPatientScreen(patient: _currentPatient!),
-                          ),
-                        ).then((_) {
-                          _fetchPatientData();
-                        });
-                        print('Edit Patient Profile for ${_currentPatient!.name}');
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit Profile'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        textStyle: const TextStyle(fontSize: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PatientMedicalRecordsScreen(
-                              patientId: _currentPatient!.id, // Pass patient ID
-                              patientName: _currentPatient!.name, // Pass patient name
-                            ),
-                          ),
-                        );
-                        print('View Medical Records for ${_currentPatient!.name}');
-                      },
-                      icon: const Icon(Icons.folder_open),
-                      label: const Text('Medical Records'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        textStyle: const TextStyle(fontSize: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PatientPrescriptionsScreen(patientName: _currentPatient!.name),
-                          ),
-                        );
-                        print('View Prescriptions for ${_currentPatient!.name}');
-                      },
-                      icon: const Icon(Icons.medication),
-                      label: const Text('Prescriptions'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        textStyle: const TextStyle(fontSize: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PatientNotesScreen(patientName: _currentPatient!.name),
-                          ),
-                        );
-                        print('View/Add Notes for ${_currentPatient!.name}');
-                      },
-                      icon: const Icon(Icons.notes),
-                      label: const Text('Notes'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        textStyle: const TextStyle(fontSize: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal[700],
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.directions, color: Colors.white),
-              label: const Text(
-                'Get Directions to Patient',
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening map directions...')),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(BuildContext context, Patient patient) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        color: Colors.teal[50],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 45,
-            backgroundColor: Colors.teal[300],
-            child: const Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            patient.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'ID: ${patient.id} | ${patient.gender}, ${patient.age}',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Contact: ${patient.contact}',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({required BuildContext context, required String title, required List<Widget> items}) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
+          : _patient == null
+          ? const Center(child: Text('Patient data is unavailable.'))
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.teal[800])),
-            const SizedBox(height: 10),
-            ...items,
+            // Profile Header
+            Center(
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.blue.shade100,
+                    child: Icon(
+                      Icons.person,
+                      size: 60,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _patient!.name,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                  Text(
+                    'ID: ${_patient!.id}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Contact Information
+            _buildSectionTitle(context, 'Contact Information'),
+            _buildInfoCard(
+              context,
+              children: [
+                _buildInfoRow(Icons.phone, 'Contact', _patient!.contact),
+                if (_patient!.email != null && _patient!.email!.isNotEmpty)
+                  _buildInfoRow(Icons.email, 'Email', _patient!.email!),
+                _buildInfoRow(Icons.location_on, 'Address', _patient!.address),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Medical Information
+            _buildSectionTitle(context, 'Medical Information'),
+            _buildInfoCard(
+              context,
+              children: [
+                _buildInfoRow(Icons.medical_services, 'Condition', _patient!.condition),
+                _buildInfoRow(Icons.calendar_today, 'Age', _patient!.age),
+                _buildInfoRow(Icons.wc, 'Gender', _patient!.gender),
+                _buildInfoRow(Icons.medication, 'Medications', _patient!.medications.join(', ')),
+                _buildInfoRow(Icons.history, 'Treatment History', _patient!.treatmentHistory.join(', ')),
+                _buildInfoRow(Icons.event_note, 'Last Visit', _patient!.lastVisit),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Emergency Contact
+            _buildSectionTitle(context, 'Emergency Contact'),
+            _buildInfoCard(
+              context,
+              children: [
+                _buildInfoRow(Icons.person_add, 'Name', _patient!.emergencyContactName ?? 'N/A'),
+                _buildInfoRow(Icons.phone_in_talk, 'Number', _patient!.emergencyContactNumber ?? 'N/A'),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Quick Actions for Patient Management
+            _buildSectionTitle(context, 'Patient Management'),
+            Wrap(
+              spacing: 12.0,
+              runSpacing: 12.0,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildActionButton(
+                  context,
+                  icon: Icons.folder_open,
+                  label: 'Medical Records',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientMedicalRecordsScreen(
+                          patientId: _patient!.id,
+                          patientName: _patient!.name,
+                        ),
+                      ),
+                    );
+                    debugPrint('View Medical Records for ${_patient!.name}');
+                  },
+                  color: Colors.indigo,
+                ),
+                _buildActionButton(
+                  context,
+                  icon: Icons.medication,
+                  label: 'Prescriptions',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PrescriptionsPage(
+                          patientId: _patient!.id,
+                          patientName: _patient!.name,
+                        ),
+                      ),
+                    );
+                    debugPrint('View Prescriptions for ${_patient!.name}');
+                  },
+                  color: Colors.green,
+                ),
+                _buildActionButton(
+                  context,
+                  icon: Icons.notes,
+                  label: 'Patient Notes',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientNotesScreen(
+                          patientId: _patient!.id,
+                          patientName: _patient!.name,
+                        ),
+                      ),
+                    );
+                    debugPrint('View Patient Notes for ${_patient!.name}');
+                  },
+                  color: Colors.orange,
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _infoRow(BuildContext context, String label, String value) {
+  Widget _buildSectionTitle(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(BuildContext context, {required List<Widget> children}) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, color: Colors.grey[600], size: 20),
+          const SizedBox(width: 12),
           Expanded(
-              flex: 3,
-              child: Text(label,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-          Expanded(
-              flex: 5,
-              child: Text(value,
-                  style: TextStyle(color: Colors.grey[800], fontSize: 14))),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? color,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color ?? Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        elevation: 3,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Colors.white),
+          ),
         ],
       ),
     );

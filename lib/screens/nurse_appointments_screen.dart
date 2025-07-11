@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:firebase_auth/firebase_auth.dart'; // For current user ID
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/patient.dart'; // Import Patient model for AppointmentStatus
+import 'package:care_flow/models/patient.dart'; // Import the Patient model (which contains Appointment)
+import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
+import 'package:flutter/foundation.dart'; // For debugPrint
 
 class NurseAppointmentsScreen extends StatefulWidget {
   const NurseAppointmentsScreen({super.key});
@@ -14,6 +17,7 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
   List<Appointment> _appointments = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  User? _currentUser;
 
   @override
   void initState() {
@@ -26,14 +30,22 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
+
+    _currentUser = FirebaseAuth.instance.currentUser;
+    if (_currentUser == null) {
+      setState(() {
+        _errorMessage = 'User not logged in. Cannot fetch appointments.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
-      // Fetch all appointments.
-      // In a more advanced scenario, you might filter by:
-      // .where('assignedToId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-      // .where('dateTime', isGreaterThanOrEqualTo: DateTime.now())
+      // Fetch appointments where the 'assignedToId' matches the current nurse's UID
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('appointments')
-          .orderBy('dateTime', descending: false) // Order by date ascending
+          .where('assignedToId', isEqualTo: _currentUser!.uid)
+          .orderBy('dateTime', descending: true) // Order by most recent appointments first
           .get();
 
       List<Appointment> fetchedAppointments = snapshot.docs.map((doc) {
@@ -44,6 +56,7 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
+          type: data['type'] ?? 'General Consultation', // <--- Added 'type' field here
           dateTime: appointmentDateTime,
           location: data['location'] ?? 'N/A',
           status: AppointmentStatus.values.firstWhere(
@@ -65,7 +78,7 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching appointments: $e');
+      debugPrint('Error fetching appointments: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading appointments: $e';
@@ -80,7 +93,7 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Appointments'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Colors.green.shade700, // Distinct color for nurse appointments
         foregroundColor: Colors.white,
         elevation: 4,
       ),
@@ -99,7 +112,7 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
       )
           : _appointments.isEmpty
           ? const Center(
-        child: Text('No appointments found. Schedule a new one!'),
+        child: Text('You have no appointments scheduled yet.'),
       )
           : ListView.builder(
         padding: const EdgeInsets.all(16.0),
@@ -117,68 +130,74 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Patient: ${appointment.patientName}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Type: ${appointment.type}', // Assuming 'type' field in Appointment
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    'Date: ${DateFormat('MMM d, yyyy').format(appointment.dateTime)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    'Time: ${DateFormat('h:mm a').format(appointment.dateTime)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    'Location: ${appointment.location}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Status: ',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        appointment.patientName,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800,
+                        ),
                       ),
-                      Chip(
-                        label: Text(appointment.status.name.toUpperCase()),
-                        backgroundColor: appointment.statusColor,
-                        labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: appointment.statusColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          appointment.status.toString().split('.').last.toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
                       ),
                     ],
                   ),
-                  if (appointment.notes.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Notes: ${appointment.notes}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Type: ${appointment.type}', // Display the appointment type
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    'Date: ${DateFormat('MMM d, yyyy').format(appointment.dateTime)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    'Time: ${TimeOfDay.fromDateTime(appointment.dateTime).format(context)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Location: ${appointment.location}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Notes: ${appointment.notes.isNotEmpty ? appointment.notes : 'N/A'}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.bottomRight,
-                    child: ElevatedButton.icon(
+                    child: OutlinedButton.icon(
                       onPressed: () {
-                        // Handle viewing/editing appointment details
-                        print('View/Edit Appointment ID: ${appointment.id}');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Viewing details for appointment ID: ${appointment.id}')),
+                        // Navigate to AppointmentDetailsPage, passing the appointment object
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AppointmentDetailsPage(appointment: appointment),
+                          ),
                         );
+                        debugPrint('View details for appointment: ${appointment.id}'); // Changed print to debugPrint
                       },
                       icon: const Icon(Icons.info_outline),
-                      label: const Text('Details'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      label: const Text('View Details'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green.shade700,
+                        side: BorderSide(color: Colors.green.shade700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
+import 'package:care_flow/models/patient.dart'; // Changed import to patient.dart
 
 class AppointmentDetailsPage extends StatelessWidget {
   final Appointment appointment; // Expect to receive an Appointment object

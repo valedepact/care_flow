@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
-import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
+import 'package:care_flow/models/patient.dart'; // Import the Patient model (which contains Appointment)
+import 'package:care_flow/screens/appointment_details_page.dart'; // Import the new AppointmentDetailsPage
+// Removed: import 'package:flutter/foundation.dart'; // debugPrint is already provided by material.dart
 
 class MyAppointmentsPage extends StatefulWidget {
   const MyAppointmentsPage({super.key});
@@ -40,7 +41,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
     }
 
     try {
-      // Fetch appointments where the patientId matches the current user's UID
+      // Fetch appointments where the 'patientId' matches the current user's UID
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('appointments')
           .where('patientId', isEqualTo: _currentUser!.uid)
@@ -55,6 +56,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
+          type: data['type'] ?? 'General Consultation', // Assuming 'type' is now available
           dateTime: appointmentDateTime,
           location: data['location'] ?? 'N/A',
           status: AppointmentStatus.values.firstWhere(
@@ -76,7 +78,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
         });
       }
     } catch (e) {
-      print('Error fetching appointments: $e');
+      debugPrint('Error fetching appointments: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading appointments: $e';
@@ -153,6 +155,10 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
+                    'Type: ${appointment.type}', // Display the appointment type
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
                     'Time: ${TimeOfDay.fromDateTime(appointment.dateTime).format(context)}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
@@ -178,7 +184,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                             builder: (context) => AppointmentDetailsPage(appointment: appointment),
                           ),
                         );
-                        print('View details for appointment: ${appointment.id}');
+                        debugPrint('View details for appointment: ${appointment.id}');
                       },
                       icon: const Icon(Icons.info_outline),
                       label: const Text('View Details'),

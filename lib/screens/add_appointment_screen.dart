@@ -51,7 +51,8 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
     try {
       QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('patients').get();
       List<Map<String, String>> fetchedPatients = snapshot.docs.map((doc) {
-        return {'id': doc.id, 'name': doc['name'] ?? 'Unknown Patient'};
+        // Explicitly cast values to String to match List<Map<String, String>>
+        return {'id': doc.id, 'name': (doc['name'] ?? 'Unknown Patient') as String};
       }).toList();
 
       if (mounted) {
@@ -85,7 +86,8 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
           .get();
 
       List<Map<String, String>> fetchedPersonnel = nurseSnapshot.docs.map((doc) {
-        return {'id': doc.id, 'name': doc['fullName'] ?? 'Unknown Nurse'};
+        // Explicitly cast values to String to match List<Map<String, String>>
+        return {'id': doc.id, 'name': (doc['fullName'] ?? 'Unknown Nurse') as String};
       }).toList();
 
       // If you had a 'Doctor' role, you'd fetch them similarly and add to the list
@@ -269,6 +271,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedPatientId = newValue;
+                    // Find the patient name from the fetched list
                     _selectedPatientName = _patients.firstWhere((p) => p['id'] == newValue)['name'];
                   });
                 },
@@ -295,6 +298,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedDoctorId = newValue;
+                    // Find the personnel name from the fetched list
                     _selectedDoctorName = _doctorsAndNurses.firstWhere((p) => p['id'] == newValue)['name'];
                   });
                 },

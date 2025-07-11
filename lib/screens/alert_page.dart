@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth for current user
 
 class AlertsPage extends StatefulWidget {
   const AlertsPage({super.key});
@@ -47,7 +48,8 @@ class _AlertsPageState extends State<AlertsPage> {
     try {
       QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('patients').get();
       List<Map<String, String>> fetchedPatients = snapshot.docs.map((doc) {
-        return {'id': doc.id, 'name': doc['name'] ?? 'Unknown Patient'};
+        // Explicitly cast values to String to match List<Map<String, String>>
+        return {'id': doc.id, 'name': (doc['name'] ?? 'Unknown Patient') as String};
       }).toList();
 
       if (mounted) {
@@ -60,7 +62,7 @@ class _AlertsPageState extends State<AlertsPage> {
       print('Error fetching patients for alerts dropdown: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading patients for alerts: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error loading patients: $e'), backgroundColor: Colors.red),
         );
         setState(() {
           _isLoadingPatients = false;
@@ -141,6 +143,8 @@ class _AlertsPageState extends State<AlertsPage> {
           'isAcknowledged': false, // Default status
           'createdAt': FieldValue.serverTimestamp(),
           'createdBy': FirebaseAuth.instance.currentUser?.uid, // Record who created it
+          // You might want to fetch and store the createdBy's name as well
+          // 'createdByName': _currentUserName, // Requires fetching current user's name
         };
 
         // Add the alert data to the 'alerts' collection

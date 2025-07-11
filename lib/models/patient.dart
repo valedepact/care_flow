@@ -2,7 +2,7 @@ import 'package:flutter/material.dart'; // For Color in AppointmentStatus
 
 // Re-defining the AppointmentStatus and Appointment classes here
 // to ensure they are available for the Patient model if needed,
-// and to keep related models together or clearly defined.
+// and to clearly define related models.
 enum AppointmentStatus {
   upcoming,
   completed,
@@ -14,6 +14,7 @@ class Appointment {
   final String id;
   final String patientId;
   final String patientName;
+  final String type; // Added 'type' field
   final DateTime dateTime;
   final String location;
   final AppointmentStatus status;
@@ -24,6 +25,7 @@ class Appointment {
     required this.id,
     required this.patientId,
     required this.patientName,
+    required this.type, // Required in constructor
     required this.dateTime,
     required this.location,
     required this.status,
@@ -42,19 +44,18 @@ class Appointment {
         return Colors.red.shade400;
       case AppointmentStatus.cancelled:
         return Colors.grey.shade400;
-      default:
-        return Colors.grey;
     }
   }
 }
 
-// Patient Model: Updated to include emergency contact information
+// Patient Model: Updated to include emergency contact information AND email
 class Patient {
   final String id;
   final String name;
   final String age; // Can be '20' or '1990-01-01' (date string)
   final String gender;
   final String contact;
+  final String? email; // Added email field
   final String address;
   final String condition;
   final List<String> medications;
@@ -74,6 +75,7 @@ class Patient {
     required this.age,
     required this.gender,
     required this.contact,
+    this.email, // Include in constructor
     required this.address,
     required this.condition,
     this.medications = const [],
@@ -82,8 +84,8 @@ class Patient {
     this.imageUrls = const [],
     this.lastVisit = 'N/A',
     this.nextAppointmentId,
-    this.emergencyContactName, // New
-    this.emergencyContactNumber, // New
+    this.emergencyContactName,
+    this.emergencyContactNumber,
   });
 
   // Factory constructor to create a Patient from a Firestore DocumentSnapshot
@@ -94,6 +96,7 @@ class Patient {
       age: data['age'] ?? '',
       gender: data['gender'] ?? '',
       contact: data['contact'] ?? '',
+      email: data['email'], // Retrieve email from Firestore
       address: data['address'] ?? '',
       condition: data['condition'] ?? '',
       medications: List<String>.from(data['medications'] ?? []),
@@ -102,8 +105,8 @@ class Patient {
       imageUrls: List<String>.from(data['imageUrls'] ?? []),
       lastVisit: data['lastVisit'] ?? 'N/A',
       nextAppointmentId: data['nextAppointmentId'],
-      emergencyContactName: data['emergencyContactName'], // New
-      emergencyContactNumber: data['emergencyContactNumber'], // New
+      emergencyContactName: data['emergencyContactName'],
+      emergencyContactNumber: data['emergencyContactNumber'],
     );
   }
 
@@ -114,6 +117,7 @@ class Patient {
       'age': age,
       'gender': gender,
       'contact': contact,
+      'email': email, // Include email in Firestore map
       'address': address,
       'condition': condition,
       'medications': medications,
@@ -122,8 +126,8 @@ class Patient {
       'imageUrls': imageUrls,
       'lastVisit': lastVisit,
       'nextAppointmentId': nextAppointmentId,
-      'emergencyContactName': emergencyContactName, // New
-      'emergencyContactNumber': emergencyContactNumber, // New
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactNumber': emergencyContactNumber,
     };
   }
 }

@@ -1,43 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore for user data
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
 
-class LoginCard extends StatefulWidget {
-  const LoginCard({super.key});
+class RegisterCard extends StatefulWidget { // This class name MUST be RegisterCard
+  const RegisterCard({super.key});
 
   @override
-  State<LoginCard> createState() => _LoginCardState();
+  State<RegisterCard> createState() => _RegisterCardState();
 }
 
-class _LoginCardState extends State<LoginCard> {
+class _RegisterCardState extends State<RegisterCard> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
+  String? _selectedRole; // To store the selected role (Patient/Nurse)
   bool _isLoading = false; // To show a loading indicator
+
+  final List<String> _roles = ['Patient', 'Nurse']; // Available roles
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedRole == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a role (Patient or Nurse).'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _isLoading = true; // Start loading
       });
 
       try {
-        // Attempt to sign in with email and password
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        // Create user with email and password
+        UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
+        // Store additional user data (full name, role) in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+          'fullName': _fullNameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'role': _selectedRole,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
         // If successful, navigate to the RoleRouterScreen
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registration successful! Redirecting...'),
+              backgroundColor: Colors.green,
+            ),
+          );
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
@@ -45,14 +77,14 @@ class _LoginCardState extends State<LoginCard> {
         }
       } on FirebaseAuthException catch (e) {
         String message;
-        if (e.code == 'user-not-found') {
-          message = 'No user found for that email.';
-        } else if (e.code == 'wrong-password') {
-          message = 'Wrong password provided for that user.';
+        if (e.code == 'weak-password') {
+          message = 'The password provided is too weak.';
+        } else if (e.code == 'email-already-in-use') {
+          message = 'The account already exists for that email.';
         } else if (e.code == 'invalid-email') {
           message = 'The email address is not valid.';
         } else {
-          message = 'Login failed: ${e.message}';
+          message = 'Registration failed: ${e.message}';
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -94,13 +126,29 @@ class _LoginCardState extends State<LoginCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "Login to Your Account",
+                "Create New Account",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
+
+              TextFormField(
+                controller: _fullNameController,
+                decoration: const InputDecoration(
+                  labelText: "Full Name",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your full name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
 
               TextFormField(
                 controller: _emailController,
@@ -132,25 +180,56 @@ class _LoginCardState extends State<LoginCard> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
+                    return 'Please enter a password';
+                  }
+                  if (value.length < 6) {
+                    return 'Password must be at least 6 characters long';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    // Handle forgot password logic
-                    print('Forgot Password pressed');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Forgot password functionality coming soon!')),
-                    );
-                  },
-                  child: const Text("Forgot Password?"),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "Confirm Password",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_reset),
                 ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please confirm your password';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Role Selection Dropdown
+              DropdownButtonFormField<String>(
+                value: _selectedRole,
+                hint: const Text('Select Role'),
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.badge),
+                ),
+                items: _roles.map((String role) {
+                  return DropdownMenuItem<String>(
+                    value: role,
+                    child: Text(role),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedRole = newValue;
+                  });
+                },
+                validator: (value) => value == null ? 'Please select a role' : null,
               ),
               const SizedBox(height: 24),
 
@@ -167,8 +246,8 @@ class _LoginCardState extends State<LoginCard> {
                   ),
                   elevation: 5,
                 ),
-                onPressed: _login,
-                child: const Text("Login"),
+                onPressed: _register,
+                child: const Text("Register"),
               ),
             ],
           ),
