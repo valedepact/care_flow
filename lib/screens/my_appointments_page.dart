@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
-import 'package:care_flow/screens/appointment_details_page.dart'; // Import the new AppointmentDetailsPage
+import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
 
 class MyAppointmentsPage extends StatefulWidget {
   const MyAppointmentsPage({super.key});
@@ -10,49 +13,78 @@ class MyAppointmentsPage extends StatefulWidget {
 }
 
 class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
-  // Dummy list of appointments for demonstration
-  final List<Appointment> _appointments = [
-    Appointment(
-      id: 'app_001',
-      patientId: 'patient_id_789', // Assuming this is the current patient
-      patientName: 'Patient John',
-      dateTime: DateTime.now().add(const Duration(days: 2, hours: 10, minutes: 30)),
-      location: 'Clinic A, Room 101',
-      status: AppointmentStatus.upcoming,
-      notes: 'Routine check-up.',
-      statusColor: Appointment.getColorForStatus(AppointmentStatus.upcoming),
-    ),
-    Appointment(
-      id: 'app_002',
-      patientId: 'patient_id_789',
-      patientName: 'Patient John',
-      dateTime: DateTime.now().subtract(const Duration(days: 5, hours: 14)),
-      location: 'Online Teleconsultation',
-      status: AppointmentStatus.completed,
-      notes: 'Follow-up on medication.',
-      statusColor: Appointment.getColorForStatus(AppointmentStatus.completed),
-    ),
-    Appointment(
-      id: 'app_003',
-      patientId: 'patient_id_789',
-      patientName: 'Patient John',
-      dateTime: DateTime.now().subtract(const Duration(days: 10, hours: 9)),
-      location: 'Clinic B, Lab',
-      status: AppointmentStatus.missed,
-      notes: 'Blood test appointment. Patient did not show up.',
-      statusColor: Appointment.getColorForStatus(AppointmentStatus.missed),
-    ),
-    Appointment(
-      id: 'app_004',
-      patientId: 'patient_id_789',
-      patientName: 'Patient John',
-      dateTime: DateTime.now().add(const Duration(days: 1, hours: 16)),
-      location: 'Clinic A, Room 203',
-      status: AppointmentStatus.upcoming,
-      notes: 'Vaccination appointment.',
-      statusColor: Appointment.getColorForStatus(AppointmentStatus.upcoming),
-    ),
-  ];
+  List<Appointment> _appointments = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAppointments();
+  }
+
+  Future<void> _fetchAppointments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    _currentUser = FirebaseAuth.instance.currentUser;
+    if (_currentUser == null) {
+      setState(() {
+        _errorMessage = 'User not logged in. Cannot fetch appointments.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // Fetch appointments where the patientId matches the current user's UID
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('patientId', isEqualTo: _currentUser!.uid)
+          .orderBy('dateTime', descending: true) // Order by most recent appointments first
+          .get();
+
+      List<Appointment> fetchedAppointments = snapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+
+        return Appointment(
+          id: doc.id,
+          patientId: data['patientId'] ?? '',
+          patientName: data['patientName'] ?? 'Unknown Patient',
+          dateTime: appointmentDateTime,
+          location: data['location'] ?? 'N/A',
+          status: AppointmentStatus.values.firstWhere(
+                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+            orElse: () => AppointmentStatus.upcoming,
+          ),
+          notes: data['notes'] ?? '',
+          statusColor: Appointment.getColorForStatus(AppointmentStatus.values.firstWhere(
+                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+            orElse: () => AppointmentStatus.upcoming,
+          )),
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _appointments = fetchedAppointments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching appointments: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading appointments: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +95,20 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: _appointments.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ),
+      )
+          : _appointments.isEmpty
           ? const Center(
         child: Text('You have no appointments scheduled yet.'),
       )
@@ -87,7 +132,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${appointment.dateTime.day}/${appointment.dateTime.month}/${appointment.dateTime.year}',
+                        DateFormat('MMM d, yyyy').format(appointment.dateTime),
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,

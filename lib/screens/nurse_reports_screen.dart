@@ -1,18 +1,120 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:care_flow/models/patient.dart'; // Import Patient model (for total patients)
+import 'package:care_flow/models/appointment.dart'; // Import Appointment model (for visit summary)
+import 'package:intl/intl.dart'; // For date formatting
 
-class NurseReportsScreen extends StatelessWidget {
+class NurseReportsScreen extends StatefulWidget {
   const NurseReportsScreen({super.key});
+
+  @override
+  State<NurseReportsScreen> createState() => _NurseReportsScreenState();
+}
+
+class _NurseReportsScreenState extends State<NurseReportsScreen> {
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  // Data for Patient Visit Summary
+  int _totalVisitsLast30Days = 0;
+  int _completedVisitsLast30Days = 0;
+  int _missedVisitsLast30Days = 0;
+  int _upcomingVisitsLast30Days = 0;
+  int _cancelledVisitsLast30Days = 0;
+
+  // Data for Overall Patient Status Summary
+  int _totalPatients = 0;
+  // Dummy counts for specific statuses, as Patient model doesn't have a 'status' field
+  int _stablePatients = 0;
+  int _improvingPatients = 0;
+  int _criticalPatients = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReportData();
+  }
+
+  Future<void> _fetchReportData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // --- Fetch Patient Visit Summary (Last 30 Days) ---
+      final DateTime thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+      QuerySnapshot appointmentSnapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('dateTime', isGreaterThanOrEqualTo: thirtyDaysAgo)
+          .get();
+
+      _totalVisitsLast30Days = appointmentSnapshot.docs.length;
+      _completedVisitsLast30Days = appointmentSnapshot.docs
+          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'completed')
+          .length;
+      _missedVisitsLast30Days = appointmentSnapshot.docs
+          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'missed')
+          .length;
+      _upcomingVisitsLast30Days = appointmentSnapshot.docs
+          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'upcoming')
+          .length;
+      _cancelledVisitsLast30Days = appointmentSnapshot.docs
+          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'cancelled')
+          .length;
+
+      // --- Fetch Overall Patient Status Summary ---
+      QuerySnapshot patientSnapshot = await FirebaseFirestore.instance.collection('patients').get();
+      _totalPatients = patientSnapshot.docs.length;
+
+      // For 'stable', 'improving', 'critical' patients:
+      // This would ideally come from a 'status' field on the patient document,
+      // or be derived from recent medical records/notes.
+      // For now, we'll use dummy values or simple distribution.
+      _stablePatients = (_totalPatients * 0.8).round(); // 80% stable
+      _improvingPatients = (_totalPatients * 0.1).round(); // 10% improving
+      _criticalPatients = _totalPatients - _stablePatients - _improvingPatients; // Remaining are critical
+      if (_criticalPatients < 0) _criticalPatients = 0; // Ensure non-negative
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching report data: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load report data: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports & Analytics'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Colors.teal.shade700, // Changed color for reports screen
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ),
+      )
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -21,23 +123,26 @@ class NurseReportsScreen extends StatelessWidget {
               'Overview of Patient Care',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
+                color: Colors.teal.shade700,
               ),
             ),
             const SizedBox(height: 24),
 
+            // Patient Visit Summary (Last 30 Days)
             _buildReportCard(
               context,
               title: 'Patient Visit Summary (Last 30 Days)',
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _reportRow('Total Visits', '50'),
-                  _reportRow('Completed Visits', '45 (90%)'),
-                  _reportRow('Missed Visits', '5 (10%)'),
+                  _reportRow('Total Visits', '$_totalVisitsLast30Days'),
+                  _reportRow('Completed Visits', '$_completedVisitsLast30Days (${(_completedVisitsLast30Days / _totalVisitsLast30Days * 100).toStringAsFixed(1)}%)'),
+                  _reportRow('Upcoming Visits', '$_upcomingVisitsLast30Days'),
+                  _reportRow('Missed Visits', '$_missedVisitsLast30Days'),
+                  _reportRow('Cancelled Visits', '$_cancelledVisitsLast30Days'),
                   const SizedBox(height: 10),
                   Text(
-                    'Trend: Consistent visit completion rate.',
+                    'Trend: Monitor missed and cancelled visits for improvement.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
                   ),
                   const SizedBox(height: 10),
@@ -57,19 +162,20 @@ class NurseReportsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Medication Adherence Overview (Placeholder - requires dedicated data)
             _buildReportCard(
               context,
               title: 'Medication Adherence Overview',
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _reportRow('Patients on Medication', '15'),
-                  _reportRow('High Adherence (>80%)', '12'),
-                  _reportRow('Moderate Adherence (50-80%)', '2'),
-                  _reportRow('Low Adherence (<50%)', '1'),
+                  _reportRow('Patients on Medication', '15'), // Dummy
+                  _reportRow('High Adherence (>80%)', '12'), // Dummy
+                  _reportRow('Moderate Adherence (50-80%)', '2'), // Dummy
+                  _reportRow('Low Adherence (<50%)', '1'), // Dummy
                   const SizedBox(height: 10),
                   Text(
-                    'Trend: Generally good adherence, one patient requires closer monitoring.',
+                    'Trend: Generally good adherence, one patient requires closer monitoring. (Requires medication log data)',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
                   ),
                   const SizedBox(height: 10),
@@ -89,17 +195,18 @@ class NurseReportsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Vital Signs Trends (Placeholder - requires dedicated data)
             _buildReportCard(
               context,
               title: 'Vital Signs Trends (Selected Patients)',
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _reportRow('Patient John Kelly', 'BP: Stable, HR: Slight increase'),
-                  _reportRow('Patient Anna Davis', 'Temp: Normal, O2 Sat: 98%'),
+                  _reportRow('Patient John Kelly', 'BP: Stable, HR: Slight increase'), // Dummy
+                  _reportRow('Patient Anna Davis', 'Temp: Normal, O2 Sat: 98%'), // Dummy
                   const SizedBox(height: 10),
                   Text(
-                    'Trend: Most vitals within normal range. Monitor John Kelly\'s heart rate.',
+                    'Trend: Most vitals within normal range. Monitor John Kelly\'s heart rate. (Requires vital signs log data)',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
                   ),
                   const SizedBox(height: 10),
@@ -119,15 +226,17 @@ class NurseReportsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Overall Patient Status Summary
             _buildReportCard(
               context,
               title: 'Overall Patient Status Summary',
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _reportRow('Stable Patients', '20'),
-                  _reportRow('Improving Patients', '3'),
-                  _reportRow('Critical Patients', '2'),
+                  _reportRow('Total Patients', '$_totalPatients'),
+                  _reportRow('Stable Patients', '$_stablePatients'),
+                  _reportRow('Improving Patients', '$_improvingPatients'),
+                  _reportRow('Critical Patients', '$_criticalPatients'),
                   const SizedBox(height: 10),
                   Text(
                     'Action: Focus on critical patients and those requiring closer monitoring.',
@@ -156,7 +265,7 @@ class NurseReportsScreen extends StatelessWidget {
               title,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.secondary,
+                color: Colors.teal.shade800, // Adjusted color for card titles
               ),
             ),
             const Divider(height: 20, thickness: 1),

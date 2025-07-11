@@ -7,6 +7,11 @@ import 'package:care_flow/screens/my_alerts_screen.dart'; // Import the new MyAl
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
 import 'package:care_flow/models/patient.dart'; // Import the Patient model (contains Appointment model)
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:care_flow/screens/my_appointments_page.dart'; // Import MyAppointmentsPage
+import 'package:care_flow/screens/patient_medical_records_screen.dart'; // Import PatientMedicalRecordsScreen
+import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Import PatientPrescriptionsScreen
+import 'package:care_flow/screens/patient_notes_screen.dart'; // Import PatientNotesScreen
+import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
 
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -219,7 +224,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.calendar_today,
                     label: 'My Appointments',
                     onPressed: () {
-                      print('My Appointments pressed');
+                      // Navigate to the MyAppointmentsPage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MyAppointmentsPage()),
+                      );
+                      print('My Appointments pressed - Navigating to appointments list');
                     },
                   ),
                   _buildDashboardButton(
@@ -227,7 +237,23 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.folder_open,
                     label: 'Medical Records',
                     onPressed: () {
-                      print('Medical Records pressed');
+                      // Ensure patientId is available before navigating
+                      if (_patientId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PatientMedicalRecordsScreen(
+                              patientId: _patientId,
+                              patientName: _patientName,
+                            ),
+                          ),
+                        );
+                        print('Medical Records pressed - Navigating to medical records');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient ID not available. Cannot view records.')),
+                        );
+                      }
                     },
                   ),
                   _buildDashboardButton(
@@ -235,7 +261,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.message,
                     label: 'Messages',
                     onPressed: () {
-                      print('Messages pressed');
+                      // Navigate to the ChatListPage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ChatListPage()),
+                      );
+                      print('Messages pressed - Navigating to chat list');
                     },
                   ),
                   _buildDashboardButton(
@@ -243,7 +274,47 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.medication,
                     label: 'Prescriptions',
                     onPressed: () {
-                      print('Prescriptions pressed');
+                      // Ensure patientId is available before navigating
+                      if (_patientId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PatientPrescriptionsScreen(
+                              patientId: _patientId,
+                              patientName: _patientName,
+                            ),
+                          ),
+                        );
+                        print('Prescriptions pressed - Navigating to prescriptions list');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient ID not available. Cannot view prescriptions.')),
+                        );
+                      }
+                    },
+                  ),
+                  _buildDashboardButton(
+                    context,
+                    icon: Icons.notes, // Icon for notes
+                    label: 'Notes',
+                    onPressed: () {
+                      // Ensure patientId is available before navigating
+                      if (_patientId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PatientNotesScreen(
+                              patientId: _patientId,
+                              patientName: _patientName,
+                            ),
+                          ),
+                        );
+                        print('Notes pressed - Navigating to patient notes');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient ID not available. Cannot view notes.')),
+                        );
+                      }
                     },
                   ),
                   _buildDashboardButton(
@@ -278,9 +349,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.list_alt, // Icon for a list/alerts
                     label: 'My Alerts',
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MyAlertsScreen()),
+                      // Implement navigation to MyAlertsScreen if you create one for patients
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('My Alerts functionality coming soon!')),
                       );
                       print('My Alerts pressed from Patient Dashboard');
                     },
@@ -337,6 +408,13 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                           alignment: Alignment.bottomRight,
                           child: ElevatedButton.icon(
                             onPressed: () {
+                              // Navigate to AppointmentDetailsPage, passing the appointment object
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AppointmentDetailsPage(appointment: _upcomingAppointment!),
+                                ),
+                              );
                               print('View Appointment Details pressed for ID: ${_upcomingAppointment!.id}');
                             },
                             icon: const Icon(Icons.arrow_forward),

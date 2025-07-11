@@ -1,124 +1,170 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:intl/intl.dart'; // For date formatting
+import 'package:care_flow/models/medical_record.dart'; // Import the MedicalRecord model
 
-class MedicalRecordsPage extends StatelessWidget {
-  // In a real application, you would pass a patient ID here
-  // and fetch the actual medical records from a backend.
-  const MedicalRecordsPage({super.key});
+class MedicalRecordsPage extends StatefulWidget {
+  final String patientId; // Now requires patientId
+  final String patientName; // For display purposes
 
-  // Dummy data for medical records
-  final Map<String, List<Map<String, String>>> _medicalRecords = const {
-    'Recent Lab Results': [
-      {'Date': '2025-07-01', 'Test': 'Complete Blood Count (CBC)', 'Result': 'Normal'},
-      {'Date': '2025-06-15', 'Test': 'Blood Glucose', 'Result': '5.5 mmol/L (Normal)'},
-      {'Date': '2025-05-20', 'Test': 'Cholesterol Panel', 'Result': 'LDL: 100 mg/dL (Normal), HDL: 55 mg/dL (Normal)'},
-    ],
-    'Imaging Reports': [
-      {'Date': '2025-06-25', 'Type': 'Chest X-ray', 'Finding': 'No acute cardiopulmonary abnormality.'},
-      {'Date': '2024-11-10', 'Type': 'Abdominal Ultrasound', 'Finding': 'Normal study.'},
-    ],
-    'Vaccination History': [
-      {'Date': '2024-10-01', 'Vaccine': 'Influenza', 'Dose': 'Annual'},
-      {'Date': '2021-03-01', 'Vaccine': 'COVID-19 (Pfizer)', 'Dose': '2nd Dose'},
-      {'Date': '2021-02-01', 'Vaccine': 'COVID-19 (Pfizer)', 'Dose': '1st Dose'},
-      {'Date': '2015-08-01', 'Vaccine': 'Tetanus, Diphtheria, Pertussis (Tdap)', 'Dose': 'Booster'},
-    ],
-    'Allergies': [
-      {'Allergen': 'Penicillin', 'Reaction': 'Rash, Hives'},
-      {'Allergen': 'Dust Mites', 'Reaction': 'Sneezing, Runny Nose'},
-    ],
-    'Chronic Conditions': [
-      {'Condition': 'Hypertension', 'Diagnosis Date': '2020-01-10', 'Status': 'Controlled'},
-      {'Condition': 'Asthma', 'Diagnosis Date': '2010-05-01', 'Status': 'Well-controlled'},
-    ],
-    'Past Surgeries': [
-      {'Date': '2018-07-20', 'Procedure': 'Appendectomy', 'Hospital': 'City General Hospital'},
-    ],
-    'Medication History': [
-      {'Medication': 'Metformin', 'Dosage': '500mg BID', 'Prescribed By': 'Dr. Emily'},
-      {'Medication': 'Ventolin Inhaler', 'Dosage': 'As needed', 'Prescribed By': 'Dr. Alex Smith'},
-      {'Medication': 'Lisinopril', 'Dosage': '10mg Daily', 'Prescribed By': 'Dr. Emily'},
-    ],
-  };
+  const MedicalRecordsPage({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+  });
+
+  @override
+  State<MedicalRecordsPage> createState() => _MedicalRecordsPageState();
+}
+
+class _MedicalRecordsPageState extends State<MedicalRecordsPage> {
+  List<MedicalRecord> _medicalRecords = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMedicalRecords();
+  }
+
+  Future<void> _fetchMedicalRecords() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    try {
+      // Fetch medical records where the patientId matches the current patient's ID
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('medicalRecords')
+          .where('patientId', isEqualTo: widget.patientId)
+          .orderBy('recordDate', descending: true) // Show most recent records first
+          .get();
+
+      List<MedicalRecord> fetchedRecords = snapshot.docs.map((doc) {
+        return MedicalRecord.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _medicalRecords = fetchedRecords;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching medical records: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading medical records: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Medical Records'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text('${widget.patientName}\'s Medical Records'),
+        backgroundColor: Colors.indigo.shade700, // Consistent color for medical records
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: _medicalRecords.entries.map((entry) {
-            return _buildRecordSection(
-              context,
-              title: entry.key,
-              records: entry.value,
-            );
-          }).toList(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildRecordSection(BuildContext context, {required String title, required List<Map<String, String>> records}) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10.0),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
+      )
+          : _medicalRecords.isEmpty
+          ? Center(
+        child: Text('No medical records found for ${widget.patientName}.'),
+      )
+          : ListView.builder(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.secondary,
+        itemCount: _medicalRecords.length,
+        itemBuilder: (context, index) {
+          final record = _medicalRecords[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 8.0),
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    record.title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Type: ${record.type}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    'Date: ${DateFormat('MMM d, yyyy').format(record.recordDate)}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (record.doctorName != null && record.doctorName!.isNotEmpty)
+                    Text(
+                      'Doctor: ${record.doctorName}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    record.content,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  if (record.fileUrl != null && record.fileUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          // Implement logic to open fileUrl (e.g., using url_launcher package)
+                          print('Opening file: ${record.fileUrl}');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Opening file from URL: ${record.fileUrl}')),
+                          );
+                        },
+                        icon: const Icon(Icons.attachment),
+                        label: const Text('View Attachment'),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const Divider(height: 20, thickness: 1),
-            records.isEmpty
-                ? Text(
-              'No $title records found.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
-            )
-                : Column(
-              children: records.map((record) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: record.entries.map((item) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${item.key}: ',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          Expanded(
-                            child: Text(
-                              item.value,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // TODO: Implement Add Medical Record functionality
+          print('Add New Medical Record for ${widget.patientName}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Add Medical Record functionality coming soon!')),
+          );
+        },
+        label: const Text('Add Record'),
+        icon: const Icon(Icons.add),
+        backgroundColor: Colors.indigo.shade700,
+        foregroundColor: Colors.white,
       ),
     );
   }

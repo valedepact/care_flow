@@ -1,65 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:intl/intl.dart'; // For date formatting
+import 'package:care_flow/models/prescription.dart'; // Import the new Prescription model
 
-class PatientPrescriptionsScreen extends StatelessWidget {
-  final String patientName; // To display whose prescriptions are being viewed
+class PatientPrescriptionsScreen extends StatefulWidget {
+  final String patientId; // Now requires patientId
+  final String patientName; // For display purposes
 
-  // In a real application, you would pass a patient ID here
-  // and fetch the actual prescriptions from a backend based on that ID.
-  const PatientPrescriptionsScreen({super.key, required this.patientName});
+  const PatientPrescriptionsScreen({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+  });
 
-  // Dummy data for prescriptions
-  // In a real app, this data would be filtered by the patientName/ID passed
-  final List<Map<String, String>> _prescriptions = const [
-    {
-      'medication': 'Metformin',
-      'dosage': '500 mg',
-      'frequency': 'Twice daily',
-      'prescribedBy': 'Dr. Emily White',
-      'refillDate': '2025-08-01',
-      'status': 'Active',
-      'notes': 'Take with food.',
-    },
-    {
-      'medication': 'Ventolin HFA (Albuterol)',
-      'dosage': '2 puffs',
-      'frequency': 'As needed for asthma symptoms',
-      'prescribedBy': 'Dr. Alex Smith',
-      'refillDate': '2025-09-15',
-      'status': 'Active',
-      'notes': 'Shake well before use.',
-    },
-    {
-      'medication': 'Lisinopril',
-      'dosage': '10 mg',
-      'frequency': 'Once daily',
-      'prescribedBy': 'Dr. Emily White',
-      'refillDate': '2025-07-05',
-      'status': 'Active (Due for Refill)',
-      'notes': 'For hypertension.',
-    },
-    {
-      'medication': 'Amoxicillin',
-      'dosage': '250 mg',
-      'frequency': 'Three times daily',
-      'prescribedBy': 'Dr. Sarah Green',
-      'refillDate': '2025-06-10',
-      'status': 'Completed',
-      'notes': 'For bacterial infection. Course finished.',
-    },
-  ];
+  @override
+  State<PatientPrescriptionsScreen> createState() => _PatientPrescriptionsScreenState();
+}
+
+class _PatientPrescriptionsScreenState extends State<PatientPrescriptionsScreen> {
+  List<Prescription> _prescriptions = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPrescriptions();
+  }
+
+  Future<void> _fetchPrescriptions() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('prescriptions')
+          .where('patientId', isEqualTo: widget.patientId) // Filter by patient ID
+          .orderBy('prescribedDate', descending: true) // Show most recent prescriptions first
+          .get();
+
+      List<Prescription> fetchedPrescriptions = snapshot.docs.map((doc) {
+        return Prescription.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _prescriptions = fetchedPrescriptions;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching prescriptions: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading prescriptions: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${patientName}\'s Prescriptions'), // Dynamic title
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text('${widget.patientName}\'s Prescriptions'),
+        backgroundColor: Colors.purple.shade700,
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: _prescriptions.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
           ? Center(
-        child: Text('No active prescriptions found for $patientName.'),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ),
+      )
+          : _prescriptions.isEmpty
+          ? Center(
+        child: Text('No prescriptions found for ${widget.patientName}.'),
       )
           : ListView.builder(
         padding: const EdgeInsets.all(16.0),
@@ -78,40 +104,54 @@ class PatientPrescriptionsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    prescription['medication']!,
+                    prescription.medicationName,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: Colors.purple.shade700,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(context, 'Dosage', prescription['dosage']!),
-                  _buildInfoRow(context, 'Frequency', prescription['frequency']!),
-                  _buildInfoRow(context, 'Prescribed By', prescription['prescribedBy']!),
-                  _buildInfoRow(context, 'Refill Date', prescription['refillDate']!),
-                  _buildInfoRow(context, 'Status', prescription['status']!),
-                  if (prescription['notes']!.isNotEmpty)
-                    _buildInfoRow(context, 'Notes', prescription['notes']!),
-                  const SizedBox(height: 16),
+                  Text(
+                    'Dosage: ${prescription.dosage}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    'Frequency: ${prescription.frequency}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    'Prescribed Date: ${DateFormat('MMM d, yyyy').format(prescription.prescribedDate)}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (prescription.endDate != null)
+                    Text(
+                      'End Date: ${DateFormat('MMM d, yyyy').format(prescription.endDate!)}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  Text(
+                    'Prescribed By: ${prescription.prescribedBy}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (prescription.notes.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Notes: ${prescription.notes}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.bottomRight,
-                    child: ElevatedButton.icon(
+                    child: TextButton.icon(
                       onPressed: () {
-                        // Simulate refill request
+                        // Implement logic to view/manage prescription details
+                        print('View/Manage Prescription ID: ${prescription.id}');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Refill request sent for ${prescription['medication']} for $patientName!')),
+                          SnackBar(content: Text('Viewing details for ${prescription.medicationName}')),
                         );
-                        print('Refill requested for ${prescription['medication']} for $patientName');
                       },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Request Refill'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green, // Green for refill
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('Details'),
                     ),
                   ),
                 ],
@@ -120,26 +160,18 @@ class PatientPrescriptionsScreen extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // TODO: Implement Add Prescription functionality
+          print('Add New Prescription for ${widget.patientName}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Add Prescription functionality coming soon!')),
+          );
+        },
+        label: const Text('Add Prescription'),
+        icon: const Icon(Icons.add),
+        backgroundColor: Colors.purple.shade700,
+        foregroundColor: Colors.white,
       ),
     );
   }
