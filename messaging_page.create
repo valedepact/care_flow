@@ -1,0 +1,293 @@
+// pages/chat_screen.dart
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+class ChatListPage extends StatelessWidget {
+  const ChatListPage({super.key});
+
+  Future<String?> _getUserName(String uid) async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    return doc.data()?['name'] as String?;
+  }
+
+  Future<String?> _getUserRole(String uid) async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    return doc.data()?['role'] as String?;
+  }
+
+  Future<List<String>> _getAllowedChatUserIds(String currentUserId, String role) async {
+    if (role == 'patient') {
+      final doc = await FirebaseFirestore.instance.collection('assignments').doc(currentUserId).get();
+      final nurseId = doc.data()?['nurseId'];
+      return nurseId != null ? [nurseId] : [];
+    } else if (role == 'nurse') {
+      final query = await FirebaseFirestore.instance
+          .collection('assignments')
+          .where('nurseId', isEqualTo: currentUserId)
+          .get();
+      return query.docs.map((doc) => doc.id).toList();
+    }
+    return [];
+  }
+
+  Future<String> _getLastMessage(String chatId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('messages')
+        .doc(chatId)
+        .collection('chats')
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      final msg = snapshot.docs.first;
+      if (msg.data().containsKey('imageUrl')) {
+        return '[Image]';
+      }
+      return msg['text'] ?? '';
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+    return FutureBuilder<String?> (
+      future: _getUserRole(currentUserId),
+      builder: (context, roleSnapshot) {
+        if (!roleSnapshot.hasData) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final userRole = roleSnapshot.data ?? '';
+        return FutureBuilder<List<String>>(
+          future: _getAllowedChatUserIds(currentUserId, userRole),
+          builder: (context, allowedSnapshot) {
+            if (!allowedSnapshot.hasData) {
+              return Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            final allowedUserIds = allowedSnapshot.data!;
+            return Scaffold(
+              appBar: AppBar(title: const Text('Chats')),
+              body: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('messages')
+                    .where('participants', arrayContains: currentUserId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  final chats = snapshot.data!.docs.where((chat) {
+                    final participants = List<String>.from(chat['participants']);
+                    return participants.any((id) => allowedUserIds.contains(id));
+                  }).toList();
+
+                  if (chats.isEmpty) {
+                    return Center(child: Text('You have no conversations yet.'));
+                  }
+
+                  return ListView.builder(
+                    itemCount: chats.length,
+                    itemBuilder: (context, index) {
+                      final chat = chats[index];
+                      final otherUserId = (chat['participants'] as List)
+                          .firstWhere((id) => id != currentUserId);
+                      return FutureBuilder<String?>(
+                        future: _getUserName(otherUserId),
+                        builder: (context, userSnapshot) {
+                          final userName = userSnapshot.data ?? otherUserId;
+                          return FutureBuilder<String>(
+                            future: _getLastMessage(chat.id),
+                            builder: (context, msgSnapshot) {
+                              final preview = msgSnapshot.data ?? '';
+                              return ListTile(
+                                title: Text('Chat with $userName'),
+                                subtitle: Text(preview, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatScreen(
+                                        chatId: chat.id,
+                                        recipientName: userName,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class ChatScreen extends StatefulWidget {
+  final String chatId;
+  final String recipientName;
+
+  const ChatScreen({super.key, required this.chatId, required this.recipientName});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final picker = ImagePicker();
+
+  void _sendMessage({String? text, String? imageUrl}) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null || (text?.isEmpty ?? true) && imageUrl == null) return;
+
+    final chatDoc = FirebaseFirestore.instance.collection('messages').doc(widget.chatId);
+    if (!(await chatDoc.get()).exists) {
+      await chatDoc.set({
+        'participants': [currentUser.uid, widget.recipientName],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    final messageData = {
+      'senderId': currentUser.uid,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+    if (text != null) messageData['text'] = text;
+    if (imageUrl != null) messageData['imageUrl'] = imageUrl;
+
+    await chatDoc.collection('chats').add(messageData);
+
+    _messageController.clear();
+    _scrollController.animateTo(
+      0.0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final ref = FirebaseStorage.instance.ref().child('chat_images').child(DateTime.now().toIso8601String());
+      await ref.putFile(File(pickedFile.path));
+      final url = await ref.getDownloadURL();
+      _sendMessage(imageUrl: url);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Chat with ${widget.recipientName}')),
+      body: Column(
+        children: [
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('messages')
+                .doc(widget.chatId)
+                .collection('typing')
+                .doc(widget.recipientName)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final isTyping = snapshot.data?.get('isTyping') == true;
+              return isTyping ? Text('${widget.recipientName} is typing...') : SizedBox.shrink();
+            },
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('messages')
+                  .doc(widget.chatId)
+                  .collection('chats')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                final messages = snapshot.data!.docs;
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    final isMe = msg['senderId'] == FirebaseAuth.instance.currentUser!.uid;
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.blueAccent : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: msg['imageUrl'] != null
+                            ? Image.network(msg['imageUrl'], width: 200)
+                            : Text(
+                                msg['text'] ?? '',
+                                style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                              ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.image),
+                  onPressed: _pickImage,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    autofocus: true,
+                    onChanged: (val) {
+                      FirebaseFirestore.instance
+                          .collection('messages')
+                          .doc(widget.chatId)
+                          .collection('typing')
+                          .doc(FirebaseAuth.instance.currentUser!.uid)
+                          .set({'isTyping': val.isNotEmpty});
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                      border: OutlineInputBorder(),
+                    ),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(text: _messageController.text.trim()),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  onPressed: () => _sendMessage(text: _messageController.text.trim()),
+                  color: Colors.blue,
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

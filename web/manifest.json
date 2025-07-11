@@ -1,6 +1,6 @@
 {
-    "name": "care_flow",
-    "short_name": "care_flow",
+    "name": "flutter_app_messagepage",
+    "short_name": "flutter_app_messagepage",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
