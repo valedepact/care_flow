@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:care_flow/models/patient.dart'; // Import Patient model (for total patients)
-import 'package:care_flow/models/appointment.dart'; // Import Appointment model (for visit summary)
-import 'package:intl/intl.dart'; // For date formatting
+// Import Patient model (for total patients)
+// Import Appointment model (for visit summary)
+// For date formatting
+// For debugPrint
 
 class NurseReportsScreen extends StatefulWidget {
   const NurseReportsScreen({super.key});
@@ -82,7 +83,7 @@ class _NurseReportsScreenState extends State<NurseReportsScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching report data: $e');
+      debugPrint('Error fetching report data: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to load report data: $e';

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth for current user
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/patient_note.dart'; // Import the new PatientNote model
+// For debugPrint
 
 class PatientNotesScreen extends StatefulWidget {
   final String patientId; // Now requires patientId
@@ -67,7 +68,7 @@ class _PatientNotesScreenState extends State<PatientNotesScreen> {
       }
       await _fetchPatientNotes();
     } catch (e) {
-      print('Error initializing user or fetching notes: $e');
+      debugPrint('Error initializing user or fetching notes: $e'); // Changed print to debugPrint
       setState(() {
         _errorMessage = 'Failed to load user data or notes: $e';
         _isLoading = false;
@@ -98,7 +99,7 @@ class _PatientNotesScreenState extends State<PatientNotesScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching patient notes: $e');
+      debugPrint('Error fetching patient notes: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading patient notes: $e';
@@ -144,7 +145,7 @@ class _PatientNotesScreenState extends State<PatientNotesScreen> {
           _fetchPatientNotes(); // Refresh the list of notes
         }
       } catch (e) {
-        print('Error adding patient note: $e');
+        debugPrint('Error adding patient note: $e'); // Changed print to debugPrint
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to add note: $e'), backgroundColor: Colors.red),
@@ -294,7 +295,7 @@ class _PatientNotesScreenState extends State<PatientNotesScreen> {
                     child: TextButton.icon(
                       onPressed: () {
                         // TODO: Implement Edit/Delete Note functionality
-                        print('View/Edit Note ID: ${note.id}');
+                        debugPrint('View/Edit Note ID: ${note.id}'); // Changed print to debugPrint
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Viewing/Editing note: ${note.title}')),
                         );

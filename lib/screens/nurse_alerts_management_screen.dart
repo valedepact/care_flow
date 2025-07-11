@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/patient_alert.dart'; // Reusing PatientAlert model for alerts
+// For debugPrint
 
 class NurseAlertsManagementScreen extends StatefulWidget {
   const NurseAlertsManagementScreen({super.key});
@@ -46,7 +47,7 @@ class _NurseAlertsManagementScreenState extends State<NurseAlertsManagementScree
         });
       }
     } catch (e) {
-      print('Error fetching alerts for nurse: $e');
+      debugPrint('Error fetching alerts for nurse: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading alerts: $e';
@@ -70,7 +71,7 @@ class _NurseAlertsManagementScreenState extends State<NurseAlertsManagementScree
         _fetchAlerts(); // Refresh the list
       }
     } catch (e) {
-      print('Error updating alert status: $e');
+      debugPrint('Error updating alert status: $e'); // Changed print to debugPrint
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update alert status: $e'), backgroundColor: Colors.red),

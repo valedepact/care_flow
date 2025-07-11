@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/prescription.dart'; // Import the new Prescription model
+// For debugPrint
 
 class PatientPrescriptionsScreen extends StatefulWidget {
   final String patientId; // Now requires patientId
@@ -51,7 +52,7 @@ class _PatientPrescriptionsScreenState extends State<PatientPrescriptionsScreen>
         });
       }
     } catch (e) {
-      print('Error fetching prescriptions: $e');
+      debugPrint('Error fetching prescriptions: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading prescriptions: $e';
@@ -145,7 +146,7 @@ class _PatientPrescriptionsScreenState extends State<PatientPrescriptionsScreen>
                     child: TextButton.icon(
                       onPressed: () {
                         // Implement logic to view/manage prescription details
-                        print('View/Manage Prescription ID: ${prescription.id}');
+                        debugPrint('View/Manage Prescription ID: ${prescription.id}'); // Changed print to debugPrint
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Viewing details for ${prescription.medicationName}')),
                         );
@@ -163,7 +164,7 @@ class _PatientPrescriptionsScreenState extends State<PatientPrescriptionsScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           // TODO: Implement Add Prescription functionality
-          print('Add New Prescription for ${widget.patientName}');
+          debugPrint('Add New Prescription for ${widget.patientName}'); // Changed print to debugPrint
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Add Prescription functionality coming soon!')),
           );

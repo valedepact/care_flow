@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:care_flow/models/patient.dart'; // Import the Patient model
+// Import the Patient model
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key});

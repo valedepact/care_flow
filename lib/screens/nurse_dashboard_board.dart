@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
-import 'package:intl/intl.dart'; // For date formatting
-// Removed: import 'package:flutter/foundation.dart'; // debugPrint is now covered by material.dart
-
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/screens/visit_schedule_page.dart';
-import 'package:care_flow/screens/alert_page.dart';
-import 'package:care_flow/screens/add_appointment_screen.dart';
-import 'package:care_flow/screens/add_patient_screen.dart';
-import 'package:care_flow/screens/messaging_page.dart';
-import 'package:care_flow/screens/nurse_patient_list_screen.dart';
-import 'package:care_flow/screens/nurse_appointments_screen.dart';
-import 'package:care_flow/screens/nurse_reports_screen.dart';
-import 'package:care_flow/screens/nurse_navigation_screen.dart';
-import 'package:care_flow/models/patient.dart'; // Import Patient model (contains Appointment)
-import 'package:care_flow/screens/patient_profile_page.dart'; // Import PatientProfilePage
+import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
+// Import the new MyAlertsScreen (for viewing)
+import 'package:care_flow/screens/add_appointment_screen.dart'; // Import the AddAppointmentScreen
+import 'package:care_flow/screens/add_patient_screen.dart'; // Import the AddPatientScreen
+import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
+import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
+import 'package:care_flow/screens/nurse_patient_list_screen.dart'; // Import NursePatientListScreen
+import 'package:care_flow/screens/nurse_appointments_screen.dart'; // Import NurseAppointmentsScreen
+import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseReportsScreen
+import 'package:care_flow/screens/nurse_navigation_screen.dart'; // Import NurseNavigationScreen
+import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Import the new NurseAlertsManagementScreen
+import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
+import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:intl/intl.dart'; // For date formatting
+// For debugPrint
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -25,83 +27,106 @@ class CaregiverDashboard extends StatefulWidget {
 
 class _CaregiverDashboardState extends State<CaregiverDashboard> {
   int _selectedIndex = 0;
-  User? _currentUser;
-  String? _currentUserName;
-  String? _currentUserRole; // This variable is now used
-
-  List<Appointment> _upcomingVisits = [];
-  bool _isLoadingVisits = true;
-  String _visitsErrorMessage = '';
-
-  List<Patient> _recentPatients = [];
-  bool _isLoadingPatients = true;
-  String _patientsErrorMessage = '';
+  String _nurseName = 'Loading...';
+  bool _isLoading = true;
+  List<Patient> _patients = []; // List to store fetched patients
+  List<Appointment> _upcomingVisits = []; // Changed to List<Appointment>
 
   @override
   void initState() {
     super.initState();
-    _initializeUserAndFetchDashboardData();
+    _fetchNurseData();
+    _fetchPatients();
+    // _fetchUpcomingVisits() will be called after _fetchNurseData completes
   }
 
-  Future<void> _initializeUserAndFetchDashboardData() async {
-    _currentUser = FirebaseAuth.instance.currentUser;
-    if (_currentUser == null) {
-      debugPrint('User not logged in. Cannot fetch dashboard data.');
-      // Optionally navigate to login or show a message
-      return;
-    }
+  Future<void> _fetchNurseData() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
 
-    try {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUser!.uid)
-          .get();
-
-      if (userDoc.exists) {
-        _currentUserName = userDoc.get('fullName') ?? 'Caregiver';
-        _currentUserRole = userDoc.get('role'); // Get the role
-      } else {
-        _currentUserName = 'Caregiver';
-        _currentUserRole = 'Unknown Role';
+        if (userDoc.exists) {
+          setState(() {
+            _nurseName = userDoc.get('fullName') ?? 'Caregiver';
+            _isLoading = false;
+          });
+          await _fetchUpcomingVisits(currentUser.uid); // Fetch visits after nurse data is loaded
+        } else {
+          debugPrint('Nurse document not found for UID: ${currentUser.uid}'); // Changed print to debugPrint
+          setState(() {
+            _nurseName = 'Caregiver (Profile Incomplete)';
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error fetching nurse data: $e'); // Changed print to debugPrint
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading nurse data: $e')),
+          );
+          setState(() {
+            _nurseName = 'Error Loading';
+            _isLoading = false;
+          });
+        }
       }
-      // Fetch data for the cards
-      await _fetchUpcomingVisits();
-      await _fetchRecentPatients();
-    } catch (e) {
-      debugPrint('Error initializing user or fetching dashboard data: $e');
-      setState(() {
-        _visitsErrorMessage = 'Failed to load dashboard data: $e';
-        _isLoadingVisits = false;
-        _patientsErrorMessage = 'Failed to load dashboard data: $e';
-        _isLoadingPatients = false;
-      });
+    } else {
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+              (route) => false,
+        );
+      }
     }
   }
 
-  Future<void> _fetchUpcomingVisits() async {
-    setState(() {
-      _isLoadingVisits = true;
-      _visitsErrorMessage = '';
-    });
+  Future<void> _fetchPatients() async {
+    try {
+      QuerySnapshot patientSnapshot = await FirebaseFirestore.instance.collection('patients').get();
+      List<Patient> fetchedPatients = patientSnapshot.docs.map((doc) {
+        return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _patients = fetchedPatients;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching patients: $e'); // Changed print to debugPrint
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading patients: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchUpcomingVisits(String nurseId) async {
     try {
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('appointments')
-          .where('assignedToId', isEqualTo: _currentUser!.uid)
-          .where('dateTime', isGreaterThanOrEqualTo: Timestamp.now()) // Only future appointments
-          .orderBy('dateTime', descending: false)
-          .limit(3) // Limit to a few upcoming visits for the dashboard glance
+          .where('assignedToId', isEqualTo: nurseId) // Filter by current nurse's ID
+          .where('dateTime', isGreaterThanOrEqualTo: DateTime.now()) // Only upcoming visits
+          .orderBy('dateTime', descending: false) // Order by date ascending
+          .limit(5) // Limit to a few upcoming visits for the dashboard card
           .get();
 
       List<Appointment> fetchedVisits = snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+        DateTime visitDateTime = (data['dateTime'] as Timestamp).toDate();
 
         return Appointment(
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
           type: data['type'] ?? 'General Consultation', // Ensure 'type' is retrieved
-          dateTime: appointmentDateTime,
+          dateTime: visitDateTime,
           location: data['location'] ?? 'N/A',
           status: AppointmentStatus.values.firstWhere(
                 (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
@@ -118,50 +143,39 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
       if (mounted) {
         setState(() {
           _upcomingVisits = fetchedVisits;
-          _isLoadingVisits = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching upcoming visits: $e');
+      debugPrint('Error fetching upcoming visits: $e'); // Changed print to debugPrint
       if (mounted) {
-        setState(() {
-          _visitsErrorMessage = 'Error loading upcoming visits: $e';
-          _isLoadingVisits = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading upcoming visits: $e')),
+        );
       }
     }
   }
 
-  Future<void> _fetchRecentPatients() async {
+  Future<void> _logout() async {
     setState(() {
-      _isLoadingPatients = true;
-      _patientsErrorMessage = '';
+      _isLoading = true;
     });
     try {
-      // For simplicity, fetching all patients for now.
-      // In a real app, you might filter by patients assigned to the current nurse.
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('patients')
-          .orderBy('createdAt', descending: true) // Assuming a 'createdAt' field
-          .limit(4) // Limit to a few recent patients for the dashboard glance
-          .get();
-
-      List<Patient> fetchedPatients = snapshot.docs.map((doc) {
-        return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
-
+      await FirebaseAuth.instance.signOut();
       if (mounted) {
-        setState(() {
-          _recentPatients = fetchedPatients;
-          _isLoadingPatients = false;
-        });
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+              (route) => false,
+        );
       }
     } catch (e) {
-      debugPrint('Error fetching recent patients: $e');
+      debugPrint('Error during logout: $e'); // Changed print to debugPrint
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging out: $e')),
+        );
         setState(() {
-          _patientsErrorMessage = 'Error loading recent patients: $e';
-          _isLoadingPatients = false;
+          _isLoading = false;
         });
       }
     }
@@ -171,23 +185,22 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     setState(() {
       _selectedIndex = index;
     });
-    // Navigate based on bottom navigation bar item
-    if (index == 1) { // 'Patients' tab
+    if (index == 1) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
       );
-    } else if (index == 2) { // 'Schedule' tab
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
       );
-    } else if (index == 3) { // 'Map' tab
+    } else if (index == 3) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
       );
-    } else if (index == 4) { // 'Reports' tab
+    } else if (index == 4) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
@@ -199,119 +212,58 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('CAREGIVER DASHBOARD (${_currentUserName ?? "Caregiver"} - ${_currentUserRole ?? "Role Unknown"})'), // Using _currentUserName and _currentUserRole
+        title: const Text('CAREGIVER DASHBOARD'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search_rounded),
             onPressed: () {
-              debugPrint('Search button pressed');
+              debugPrint('Search button pressed'); // Changed print to debugPrint
             },
           ),
           IconButton(
             icon: const Icon(Icons.notifications_rounded),
             onPressed: () {
-              debugPrint('Notifications button pressed');
+              debugPrint('Notifications button pressed'); // Changed print to debugPrint
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Logout',
           ),
         ],
       ),
-      body: SafeArea(
+      body: _isLoading
+          ? const Center(
+        child: CircularProgressIndicator(),
+      )
+          : SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Welcome section
                 Text(
-                  'Hello, ${_currentUserName ?? 'Caregiver'}!',
+                  'Hello, $_nurseName!',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 Text(
-                  'Today, ${DateFormat('MMM d').format(DateTime.now())}',
+                  'Today, ${DateFormat('MMM d').format(DateTime.now())}', // Dynamic date
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
                       ?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
                 ),
                 const SizedBox(height: 24),
-                // Overview section
                 Text(
                   'Your Day at a Glance',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
-                // Patient list and upcoming Patient visits row
                 Row(
                   children: [
                     Expanded(
-                      child: _buildDashboardInfoCard(
-                        context,
-                        title: 'RECENT PATIENTS',
-                        content: _isLoadingPatients
-                            ? 'Loading patients...'
-                            : _patientsErrorMessage.isNotEmpty
-                            ? _patientsErrorMessage
-                            : _recentPatients.isEmpty
-                            ? 'No patients found.'
-                            : '', // Content will be built by ListView
-                        icon: Icons.group,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
-                          );
-                          debugPrint('Navigating to Nurse Patient List Screen');
-                        },
-                        child: _isLoadingPatients
-                            ? const Center(child: CircularProgressIndicator())
-                            : _patientsErrorMessage.isNotEmpty
-                            ? Center(child: Text(_patientsErrorMessage, style: const TextStyle(color: Colors.red)))
-                            : _recentPatients.isEmpty
-                            ? const Center(child: Text('No recent patients.'))
-                            : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _recentPatients.length,
-                          itemBuilder: (context, index) {
-                            final patient = _recentPatients[index];
-                            return InkWell( // Make the entire row tappable
-                              onTap: () {
-                                // Navigate to PatientProfilePage, passing the patient ID and Name
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PatientProfilePage(
-                                      patientId: patient.id,
-                                      patientName: patient.name,
-                                    ),
-                                  ),
-                                );
-                                debugPrint('Tapped on patient: ${patient.name}');
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        patient.name,
-                                        style: Theme.of(context).textTheme.bodyLarge,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      patient.condition.isNotEmpty ? patient.condition : 'N/A',
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                      child: _patientListCard(),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -320,7 +272,6 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Patient Activity Log and Alerts/Notifications row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -332,7 +283,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
-                          '25', // This should be dynamic from Firestore
+                          '${_patients.length}',
                           style: Theme.of(context).textTheme.headlineMedium,
                         ),
                       ],
@@ -345,7 +296,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
-                          '${_upcomingVisits.length}', // Dynamic count of today's visits
+                          '${_upcomingVisits.length}', // Dynamic today's visits
                           style: Theme.of(context).textTheme.headlineMedium,
                         ),
                       ],
@@ -366,7 +317,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
                         );
-                        debugPrint('View All Schedule button pressed');
+                        debugPrint('View All Schedule button pressed'); // Changed print to debugPrint
                       },
                       child: Text(
                         'View All',
@@ -378,15 +329,14 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Quick Actions Section
                 Text(
                   'Quick Actions',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
                 Wrap(
-                  spacing: 12.0, // horizontal spacing
-                  runSpacing: 12.0, // vertical spacing
+                  spacing: 12.0,
+                  runSpacing: 12.0,
                   alignment: WrapAlignment.center,
                   children: [
                     QuickActionButton(
@@ -396,8 +346,10 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const AddPatientScreen()),
-                        );
-                        debugPrint('Add Patient button pressed');
+                        ).then((_) {
+                          _fetchPatients();
+                        });
+                        debugPrint('Add Patient button pressed'); // Changed print to debugPrint
                       },
                       color: Colors.purple,
                     ),
@@ -409,7 +361,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const AddAppointmentScreen()),
                         );
-                        debugPrint('New appointment button pressed');
+                        debugPrint('New appointment button pressed'); // Changed print to debugPrint
                       },
                       color: Colors.orange,
                     ),
@@ -421,7 +373,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
                         );
-                        debugPrint('Generate Report button pressed - Navigating to reports screen');
+                        debugPrint('Generate Report button pressed - Navigating to reports screen'); // Changed print to debugPrint
                       },
                       color: Colors.teal,
                     ),
@@ -433,7 +385,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
                         );
-                        debugPrint('Navigation button pressed - Navigating to navigation screen');
+                        debugPrint('Navigation button pressed - Navigating to navigation screen'); // Changed print to debugPrint
                       },
                       color: Colors.redAccent,
                     ),
@@ -445,7 +397,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const AlertsPage()),
                         );
-                        debugPrint('Schedule Reminder button pressed');
+                        debugPrint('Schedule Reminder button pressed'); // Changed print to debugPrint
                       },
                       color: Colors.blueGrey,
                     ),
@@ -457,7 +409,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const ChatListPage()),
                         );
-                        debugPrint('Messages button pressed from Nurse Dashboard');
+                        debugPrint('Messages button pressed from Nurse Dashboard'); // Changed print to debugPrint
                       },
                       color: Colors.indigo,
                     ),
@@ -469,9 +421,21 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
                         );
-                        debugPrint('My Appointments button pressed from Nurse Dashboard');
+                        debugPrint('My Appointments button pressed from Nurse Dashboard'); // Changed print to debugPrint
                       },
                       color: Colors.green,
+                    ),
+                    QuickActionButton(
+                      label: 'Manage Alerts',
+                      icon: Icons.list_alt,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
+                        );
+                        debugPrint('Manage Alerts pressed from Nurse Dashboard'); // Changed print to debugPrint
+                      },
+                      color: Colors.deepPurple,
                     ),
                   ],
                 ),
@@ -513,107 +477,143 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     );
   }
 
-  // Helper for general info cards on dashboard
-  Widget _buildDashboardInfoCard(BuildContext context, {
-    required String title,
-    String? content, // Made optional as child widget will provide content
-    required IconData icon,
-    required VoidCallback onTap,
-    Widget? child, // Added optional child to allow custom content
-  }) {
+  // Patient List Card
+  Widget _patientListCard() {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PATIENT LIST',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1.5),
+            _patients.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text('No patients assigned yet.'),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _patients.length > 4 ? 4 : _patients.length,
+              itemBuilder: (context, index) {
+                final Patient patient = _patients[index];
+                return InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientProfilePage(
+                          patientId: patient.id,
+                          patientName: patient.name,
+                        ),
+                      ),
+                    ).then((_) {
+                      _fetchPatients();
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Text(patient.name),
+                        const Spacer(),
+                        Text(patient.condition.isNotEmpty ? patient.condition : 'Stable'),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-              const Divider(thickness: 1.5, height: 20),
-              if (child != null)
-                Expanded(child: child) // Use the provided child for content
-              else if (content != null && content.isNotEmpty)
-                Text(
-                  content,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
-                ),
-              const SizedBox(height: 10),
+                );
+              },
+            ),
+            if (_patients.length > 4)
               Align(
                 alignment: Alignment.bottomRight,
-                child: Icon(Icons.arrow_forward, color: Theme.of(context).colorScheme.primary),
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
+                    ).then((_) {
+                      _fetchPatients();
+                    });
+                    debugPrint('View All Patients pressed'); // Changed print to debugPrint
+                  },
+                  child: Text(
+                    'View All Patients',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  // Upcoming Patients Visits Card (now fetches real data)
+  // Upcoming Patients Visits Card
   Widget _upcomingPatientsVisitsCard() {
-    return _buildDashboardInfoCard(
-      context,
-      title: 'UPCOMING VISITS',
-      content: _isLoadingVisits
-          ? 'Loading visits...'
-          : _visitsErrorMessage.isNotEmpty
-          ? _visitsErrorMessage
-          : _upcomingVisits.isEmpty
-          ? 'No upcoming visits.'
-          : '', // Content will be built by ListView
-      icon: Icons.calendar_today,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()), // Navigate to full appointments
-        );
-        debugPrint('Navigating to Nurse Appointments Screen from Upcoming Visits Card');
-      },
-      child: _isLoadingVisits
-          ? const Center(child: CircularProgressIndicator())
-          : _visitsErrorMessage.isNotEmpty
-          ? Center(child: Text(_visitsErrorMessage, style: const TextStyle(color: Colors.red)))
-          : _upcomingVisits.isEmpty
-          ? const Center(child: Text('No upcoming visits.'))
-          : ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _upcomingVisits.length,
-        itemBuilder: (context, index) {
-          final visit = _upcomingVisits[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              children: [
-                Expanded(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'UPCOMING PATIENT VISITS',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1.5),
+            _upcomingVisits.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text('No upcoming visits today.'),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _upcomingVisits.length, // Display all fetched visits
+              itemBuilder: (context, index) {
+                final visit = _upcomingVisits[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Text(visit.patientName),
+                      const SizedBox(width: 10),
+                      Text(visit.location),
+                      const Spacer(),
+                      Text(DateFormat('h:mm a').format(visit.dateTime)),
+                    ],
+                  ),
+                );
+              },
+            ),
+            if (_upcomingVisits.isNotEmpty) // Show "View All" if there are any visits
+              Align(
+                alignment: Alignment.bottomRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
+                    );
+                    debugPrint('View All Visits pressed'); // Changed print to debugPrint
+                  },
                   child: Text(
-                    visit.patientName,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    overflow: TextOverflow.ellipsis,
+                    'View All Visits',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  DateFormat('h:mm a').format(visit.dateTime),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          );
-        },
+              ),
+          ],
+        ),
       ),
     );
   }

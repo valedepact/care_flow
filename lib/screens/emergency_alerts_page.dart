@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+// For debugPrint
 
 class EmergencyAlertsPage extends StatefulWidget {
   const EmergencyAlertsPage({super.key});
@@ -44,10 +45,10 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
             });
           }
         } else {
-          print('Patient document not found for UID: ${currentUser.uid}');
+          debugPrint('Patient document not found for UID: ${currentUser.uid}');
         }
       } catch (e) {
-        print('Error fetching patient data for emergency alert: $e');
+        debugPrint('Error fetching patient data for emergency alert: $e');
       }
     }
   }
@@ -97,7 +98,7 @@ class _EmergencyAlertsPageState extends State<EmergencyAlertsPage> {
         _messageController.clear();
       }
     } catch (e) {
-      print('Error sending emergency alert: $e');
+      debugPrint('Error sending emergency alert: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

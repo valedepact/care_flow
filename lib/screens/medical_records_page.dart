@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/medical_record.dart'; // Import the MedicalRecord model
+// For debugPrint
 
 class MedicalRecordsPage extends StatefulWidget {
   final String patientId; // Now requires patientId
@@ -52,7 +53,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage> {
         });
       }
     } catch (e) {
-      print('Error fetching medical records: $e');
+      debugPrint('Error fetching medical records: $e'); // Changed print to debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading medical records: $e';
@@ -137,7 +138,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage> {
                       child: TextButton.icon(
                         onPressed: () {
                           // Implement logic to open fileUrl (e.g., using url_launcher package)
-                          print('Opening file: ${record.fileUrl}');
+                          debugPrint('Opening file: ${record.fileUrl}'); // Changed print to debugPrint
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Opening file from URL: ${record.fileUrl}')),
                           );
@@ -156,7 +157,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           // TODO: Implement Add Medical Record functionality
-          print('Add New Medical Record for ${widget.patientName}');
+          debugPrint('Add New Medical Record for ${widget.patientName}'); // Changed print to debugPrint
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Add Medical Record functionality coming soon!')),
           );

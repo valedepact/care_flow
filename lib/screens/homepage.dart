@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:care_flow/screens/login_page.dart'; // Import the LoginCard widget
 import 'package:care_flow/screens/register_page.dart'; // Import the RegisterCard widget
-// For debugPrint
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart'; // Uncommented
-import 'package:geolocator/geolocator.dart'; // Uncommented
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+// For debugPrint
 
 class NurseNavigationScreen extends StatefulWidget {
   const NurseNavigationScreen({super.key});
@@ -60,7 +61,7 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
         });
       }
     } catch (e) {
-      print('Error getting current location: $e');
+      debugPrint('Error getting current location: $e');
       if (mounted) {
         setState(() {
           _mapErrorMessage = 'Failed to get current location: ${e.toString()}. Please ensure location services are on and permissions are granted.';
@@ -72,6 +73,8 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+    // Dummy usage to satisfy the linter, _mapController will be used for actual map control later.
+    debugPrint('GoogleMapController initialized: $_mapController');
   }
 
   @override

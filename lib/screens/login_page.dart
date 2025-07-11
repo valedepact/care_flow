@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
+// For debugPrint
 
 class LoginCard extends StatefulWidget {
   const LoginCard({super.key});
@@ -144,7 +145,7 @@ class _LoginCardState extends State<LoginCard> {
                 child: TextButton(
                   onPressed: () {
                     // Handle forgot password logic
-                    print('Forgot Password pressed');
+                    debugPrint('Forgot Password pressed'); // Changed print to debugPrint
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Forgot password functionality coming soon!')),
                     );

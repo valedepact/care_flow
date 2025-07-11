@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // For current user ID
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/models/patient.dart'; // Import the Patient model (which contains Appointment)
 import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 
 class NurseAppointmentsScreen extends StatefulWidget {
   const NurseAppointmentsScreen({super.key});

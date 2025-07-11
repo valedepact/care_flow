@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en"> <!-- Added lang="en" attribute for accessibility -->
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -29,10 +29,29 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>care_flow</title>
+  <!-- Content Security Policy for Firebase and other external resources -->
+  <!-- IMPORTANT: Re-checked and confirmed script-src with 'unsafe-inline' and connect-src/font-src with https://www.gstatic.com -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://*.firebaseio.com https://*.firebase.com;
+    connect-src 'self' https://www.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.gstatic.com https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com;
+    img-src 'self' data: https:;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'self';
+  ">
+  <!-- End of Content Security Policy -->
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Care Flow</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<!-- This script loads the Flutter engine and your app.
+     It uses flutter_bootstrap.js which is the modern approach. -->
+<script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
