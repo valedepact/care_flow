@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/patient.dart'; // Import the Patient model (which contains Appointment)
-import 'package:care_flow/screens/appointment_details_page.dart'; // Import the new AppointmentDetailsPage
-// Removed: import 'package:flutter/foundation.dart'; // debugPrint is already provided by material.dart
+import 'package:care_flow/models/patient.dart'; // Changed import to patient.dart
+import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
 
 class MyAppointmentsPage extends StatefulWidget {
   const MyAppointmentsPage({super.key});
@@ -41,12 +40,14 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
     }
 
     try {
-      // Fetch appointments where the 'patientId' matches the current user's UID
+      // Fetch appointments where the patientId matches the current user's UID
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('appointments')
           .where('patientId', isEqualTo: _currentUser!.uid)
           .orderBy('dateTime', descending: true) // Order by most recent appointments first
           .get();
+
+      if (!mounted) return; // Check mounted after await
 
       List<Appointment> fetchedAppointments = snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
@@ -184,7 +185,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                             builder: (context) => AppointmentDetailsPage(appointment: appointment),
                           ),
                         );
-                        debugPrint('View details for appointment: ${appointment.id}');
+                        print('View details for appointment: ${appointment.id}');
                       },
                       icon: const Icon(Icons.info_outline),
                       label: const Text('View Details'),

@@ -18,7 +18,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
   String? _selectedDoctorId; // Store doctor/nurse ID
   String? _selectedDoctorName; // Store doctor/nurse name for display
 
-  String _appointmentType = 'Consultation';
+  String _appointmentType = 'Consultation'; // This will be the 'type' field
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
 
@@ -50,6 +50,9 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
     });
     try {
       QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('patients').get();
+
+      if (!mounted) return; // Check mounted after await
+
       List<Map<String, String>> fetchedPatients = snapshot.docs.map((doc) {
         // Explicitly cast values to String to match List<Map<String, String>>
         return {'id': doc.id, 'name': (doc['name'] ?? 'Unknown Patient') as String};
@@ -84,6 +87,8 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
           .collection('users')
           .where('role', isEqualTo: 'Nurse')
           .get();
+
+      if (!mounted) return; // Check mounted after await
 
       List<Map<String, String>> fetchedPersonnel = nurseSnapshot.docs.map((doc) {
         // Explicitly cast values to String to match List<Map<String, String>>
@@ -125,6 +130,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime(2101),
     );
+    if (!mounted) return; // Check mounted after await
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
@@ -137,6 +143,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
       context: context,
       initialTime: _selectedTime,
     );
+    if (!mounted) return; // Check mounted after await
     if (picked != null && picked != _selectedTime) {
       setState(() {
         _selectedTime = picked;
@@ -176,7 +183,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
           'patientName': _selectedPatientName,
           'assignedToId': _selectedDoctorId, // Can be nurse or doctor
           'assignedToName': _selectedDoctorName,
-          'type': _appointmentType,
+          'type': _appointmentType, // Save the selected appointment type
           'dateTime': appointmentDateTime, // Firestore will convert this to Timestamp
           'notes': _notesController.text.trim(),
           'status': 'upcoming', // Default status
@@ -186,6 +193,8 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
 
         // Add the appointment data to the 'appointments' collection
         await FirebaseFirestore.instance.collection('appointments').add(appointmentData);
+
+        if (!mounted) return; // Check mounted after await
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

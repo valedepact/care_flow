@@ -40,6 +40,8 @@ class _PatientMedicalRecordsScreenState extends State<PatientMedicalRecordsScree
           .orderBy('recordDate', descending: true) // Show most recent records first
           .get();
 
+      if (!mounted) return; // Check mounted after await
+
       List<MedicalRecord> fetchedRecords = snapshot.docs.map((doc) {
         return MedicalRecord.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();

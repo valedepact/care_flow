@@ -28,6 +28,9 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
     });
     try {
       QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('patients').get();
+
+      if (!mounted) return; // Check mounted after await
+
       List<Patient> fetchedPatients = snapshot.docs.map((doc) {
         return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // For authentication state changes
-import 'package:cloud_firestore/cloud_firestore.dart'; // For fetching user role from Firestore
-
-import 'package:care_flow/screens/homepage.dart'; // Import your MyHomePage
-import 'package:care_flow/screens/patient_dashboard_page.dart'; // Patient's dashboard
-import 'package:care_flow/screens/nurse_dashboard_board.dart'; // Nurse's dashboard (CaregiverDashboard)
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:care_flow/screens/patient_dashboard_page.dart';
+import 'package:care_flow/screens/nurse_dashboard_board.dart';
+import 'package:care_flow/screens/dashboard_page.dart'; // The initial landing page
 
 class RoleRouterScreen extends StatefulWidget {
   const RoleRouterScreen({super.key});
@@ -17,100 +16,110 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
   @override
   void initState() {
     super.initState();
-    _checkUserAndNavigate();
+    _checkUserRole();
   }
 
-  Future<void> _checkUserAndNavigate() async {
-    // Listen to authentication state changes
-    FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-      if (user == null) {
-        // No user is signed in, go to login/register page
+  Future<void> _checkUserRole() async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      debugPrint('RoleRouter: No user logged in. Navigating to DashboardPage.');
+      // If no user is logged in, navigate to the initial DashboardPage
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Navigator.pushAndRemoveUntil(
+          Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const MyHomePage()), // Correctly refers to MyHomePage
-                (route) => false, // Remove all previous routes
+            MaterialPageRoute(builder: (context) => const DashboardPage()),
           );
         }
-      } else {
-        // User is signed in, fetch their role from Firestore
-        try {
-          DocumentSnapshot userDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      });
+      return;
+    }
 
-          if (userDoc.exists) {
-            String? role = userDoc.get('role'); // Get the 'role' field
+    debugPrint('RoleRouter: User logged in: ${user.uid}. Checking Firestore role...');
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
-            if (mounted) {
-              if (role == 'Patient') {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const PatientDashboardPage()),
-                      (route) => false,
-                );
-              } else if (role == 'Nurse') {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CaregiverDashboard()), // Correctly refers to CaregiverDashboard
-                      (route) => false,
-                );
-              } else {
-                // Handle unknown role or no role found
-                debugPrint('Unknown role or role not set for user: ${user.uid}');
-                // Optionally sign out and go to login page
-                await FirebaseAuth.instance.signOut();
+      if (!mounted) {
+        debugPrint('RoleRouter: Widget unmounted after Firestore fetch.');
+        return; // Check mounted after await
+      }
+
+      if (userDoc.exists) {
+        String? role = userDoc.get('role');
+        debugPrint('RoleRouter: User document exists. Role found: $role');
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            if (role == 'Patient') {
+              debugPrint('RoleRouter: Navigating to PatientDashboardPage.');
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const PatientDashboardPage()),
+              );
+            } else if (role == 'Nurse') {
+              debugPrint('RoleRouter: Navigating to CaregiverDashboard.');
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CaregiverDashboard()),
+              );
+            } else {
+              debugPrint('RoleRouter: Unknown role ($role) or incomplete profile for UID: ${user.uid}. Signing out.');
+              // Handle unknown role or incomplete profile
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Unknown role or incomplete profile. Please log in again.')),
+              );
+              FirebaseAuth.instance.signOut().then((_) {
                 if (mounted) {
-                  Navigator.pushAndRemoveUntil(
+                  Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const MyHomePage()),
-                        (route) => false,
+                    MaterialPageRoute(builder: (context) => const DashboardPage()),
                   );
                 }
-              }
-            }
-          } else {
-            // User document does not exist in Firestore (e.g., deleted manually)
-            debugPrint('User document not found for UID: ${user.uid}');
-            await FirebaseAuth.instance.signOut(); // Sign out the invalid user
-            if (mounted) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const MyHomePage()),
-                    (route) => false,
-              );
+              });
             }
           }
-        } catch (e) {
-          debugPrint('Error fetching user role: $e');
-          // In case of error, sign out and go to login page
-          await FirebaseAuth.instance.signOut();
+        });
+      } else {
+        // User document does not exist, meaning user is authenticated but profile is not set up
+        debugPrint('RoleRouter: User profile not found for UID: ${user.uid}. Signing out.');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const MyHomePage()),
-                  (route) => false,
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User profile not found. Please complete registration or log in.')),
             );
+            FirebaseAuth.instance.signOut().then((_) {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DashboardPage()),
+                );
+              }
+            });
           }
-        }
+        });
       }
-    });
+    } catch (e) {
+      debugPrint("RoleRouter: Error checking user role: $e. Navigating to DashboardPage.");
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error checking user role: $e')),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardPage()),
+          );
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Show a loading indicator while determining the route
     return const Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 20),
-            Text('Loading user profile...'),
-          ],
-        ),
+        child: CircularProgressIndicator(),
       ),
     );
   }

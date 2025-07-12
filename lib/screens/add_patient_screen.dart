@@ -14,7 +14,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _contactNumberController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController(); // Controller for email
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _conditionController = TextEditingController();
   final TextEditingController _emergencyContactNameController = TextEditingController();
@@ -30,7 +30,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     _fullNameController.dispose();
     _dateOfBirthController.dispose();
     _contactNumberController.dispose();
-    _emailController.dispose();
+    _emailController.dispose(); // Dispose email controller
     _addressController.dispose();
     _conditionController.dispose();
     _emergencyContactNameController.dispose();
@@ -45,6 +45,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
+    if (!mounted) return; // Check mounted after await
     if (picked != null) {
       setState(() {
         _dateOfBirthController.text = picked.toLocal().toIso8601String().split('T')[0];
@@ -65,7 +66,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
           'age': _dateOfBirthController.text.trim(), // Storing DOB as age string for now
           'gender': _selectedGender ?? 'N/A',
           'contact': _contactNumberController.text.trim(),
-          'email': _emailController.text.trim(),
+          'email': _emailController.text.trim(), // Save email
           'address': _addressController.text.trim(),
           'condition': _conditionController.text.trim(),
           'medications': [], // Placeholder, can be updated later
@@ -82,6 +83,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         // Add the patient data to the 'patients' collection in Firestore
         await FirebaseFirestore.instance.collection('patients').add(patientData);
 
+        if (!mounted) return; // Check mounted after await
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -93,7 +96,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
           _fullNameController.clear();
           _dateOfBirthController.clear();
           _contactNumberController.clear();
-          _emailController.clear();
+          _emailController.clear(); // Clear email controller
           _addressController.clear();
           _conditionController.clear();
           _emergencyContactNameController.clear();
@@ -299,7 +302,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Add Patient Button
               SizedBox(
                 width: double.infinity,
                 child: _isLoading

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore for user data
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
+import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:care_flow/screens/login_page.dart'; // Import LoginPage for navigation
 
 class RegisterCard extends StatefulWidget { // This class name MUST be RegisterCard
   const RegisterCard({super.key});
@@ -34,12 +36,14 @@ class _RegisterCardState extends State<RegisterCard> {
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedRole == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a role (Patient or Nurse).'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a role (Patient or Nurse).'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
 
@@ -61,6 +65,27 @@ class _RegisterCardState extends State<RegisterCard> {
           'role': _selectedRole,
           'createdAt': FieldValue.serverTimestamp(),
         });
+
+        // If the user registered as a Patient, create a corresponding patient document
+        if (_selectedRole == 'Patient') {
+          await FirebaseFirestore.instance.collection('patients').doc(userCredential.user!.uid).set({
+            'name': _fullNameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'age': 'N/A', // Default values, can be updated later
+            'gender': 'N/A',
+            'contact': 'N/A',
+            'address': 'N/A',
+            'condition': 'N/A',
+            'medications': [],
+            'treatmentHistory': [],
+            'notes': [],
+            'imageUrls': [],
+            'lastVisit': 'N/A',
+            'emergencyContactName': null,
+            'emergencyContactNumber': null,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         // If successful, navigate to the RoleRouterScreen
         if (mounted) {
@@ -86,6 +111,7 @@ class _RegisterCardState extends State<RegisterCard> {
         } else {
           message = 'Registration failed: ${e.message}';
         }
+        debugPrint('FirebaseAuthException: $e'); // Use debugPrint
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -95,6 +121,7 @@ class _RegisterCardState extends State<RegisterCard> {
           );
         }
       } catch (e) {
+        debugPrint('An unexpected error occurred: $e'); // Use debugPrint
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -248,6 +275,19 @@ class _RegisterCardState extends State<RegisterCard> {
                 ),
                 onPressed: _register,
                 child: const Text("Register"),
+              ),
+              const SizedBox(height: 20), // Added spacing
+              TextButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()), // Navigate to LoginPage
+                  );
+                },
+                child: Text(
+                  'Already have an account? Login',
+                  style: TextStyle(color: Theme.of(context).colorScheme.secondary),
+                ),
               ),
             ],
           ),

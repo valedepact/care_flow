@@ -1,9 +1,89 @@
-import 'package:care_flow/screens/login_page.dart'; // Assuming LoginCard is defined here
-import 'package:care_flow/screens/register_page.dart'; // Assuming RegisterCard is defined here
 import 'package:flutter/material.dart';
+import 'package:care_flow/screens/login_page.dart'; // Import LoginPage for navigation
+import 'package:care_flow/screens/register_page.dart'; // Import RegisterCard from its dedicated file
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  // These variables are no longer needed in DashboardPage as it's a landing page
+  // String _patientName = 'Loading...';
+  // String _patientId = '';
+  // bool _isLoadingUserData = true; // Separate loading for user data
+  //
+  // Appointment? _upcomingAppointment; // To store the fetched upcoming appointment
+  // bool _isLoadingUpcomingAppointment = true;
+  // String _upcomingAppointmentErrorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // This DashboardPage is now the initial landing page.
+    // It should not fetch patient data directly unless a user is already logged in.
+    // The main purpose here is to present login/register options.
+    // We can keep the data fetching logic for the actual PatientDashboardPage.
+  }
+
+  // Helper method to build primary CTA buttons
+  Widget _buildCTAButton(BuildContext context, String text, VoidCallback onPressed) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        elevation: 5,
+      ),
+      child: Text(text),
+    );
+  }
+
+  // Helper method to build outlined CTA buttons
+  Widget _buildOutlinedCTAButton(BuildContext context, String text, VoidCallback onPressed) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.primary,
+        side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      child: Text(text),
+    );
+  }
+
+  // Helper method to build feature list items
+  Widget _buildFeatureItem(BuildContext context, IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // Center the features
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -19,8 +99,6 @@ class DashboardPage extends StatelessWidget {
               const SizedBox(height: 40),
 
               // 1. Logo and System Name
-              // Using a placeholder image for the logo. You should replace 'assets/logo.png'
-              // with your actual logo path and ensure it's added to your pubspec.yaml.
               Image.network(
                 'https://placehold.co/100x100/007BFF/FFFFFF?text=Logo', // Placeholder logo
                 height: 100,
@@ -87,28 +165,34 @@ class DashboardPage extends StatelessWidget {
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildCTAButton(context, 'Login', () {
-                          // Navigate to Login Page (or show LoginCard in a dialog/overlay)
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const LoginCard()), // Assuming LoginCard is a full page for now
-                          );
-                          print('Login button pressed');
-                        }),
+                        Expanded( // Added Expanded
+                          child: _buildCTAButton(context, 'Login', () {
+                            // Navigate to Login Page
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginPage()), // Correct LoginPage
+                            );
+                            debugPrint('Login button pressed');
+                          }),
+                        ),
                         const SizedBox(width: 20),
-                        _buildCTAButton(context, 'Sign Up', () {
-                          // Navigate to Sign Up Page (or show RegisterCard in a dialog/overlay)
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RegisterCard()), // Assuming RegisterCard is a full page for now
-                          );
-                          print('Sign Up button pressed');
-                        }),
+                        Expanded( // Added Expanded
+                          child: _buildCTAButton(context, 'Sign Up', () {
+                            // Navigate to Sign Up Page
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RegisterCard()), // Correct RegisterCard
+                            );
+                            debugPrint('Sign Up button pressed');
+                          }),
+                        ),
                         const SizedBox(width: 20),
-                        _buildOutlinedCTAButton(context, 'Learn More', () {
-                          // Handle Learn More action (e.g., scroll to a section, open a URL)
-                          print('Learn More button pressed');
-                        }),
+                        Expanded( // Added Expanded
+                          child: _buildOutlinedCTAButton(context, 'Learn More', () {
+                            // Handle Learn More action (e.g., scroll to a section, open a URL)
+                            debugPrint('Learn More button pressed');
+                          }),
+                        ),
                       ],
                     );
                   } else {
@@ -117,19 +201,19 @@ class DashboardPage extends StatelessWidget {
                         _buildCTAButton(context, 'Login', () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const LoginCard()),
+                            MaterialPageRoute(builder: (context) => const LoginPage()),
                           );
                         }),
                         const SizedBox(height: 16),
                         _buildCTAButton(context, 'Sign Up', () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const RegisterCard()),
+                            MaterialPageRoute(builder: (context) => const RegisterCard()), // Correct RegisterCard
                           );
                         }),
                         const SizedBox(height: 16),
                         _buildOutlinedCTAButton(context, 'Learn More', () {
-                          print('Learn More button pressed');
+                          debugPrint('Learn More button pressed');
                         }),
                       ],
                     );
@@ -139,7 +223,6 @@ class DashboardPage extends StatelessWidget {
               const SizedBox(height: 40),
 
               // 6. Visuals (Placeholder)
-              // You can replace this with a more complex illustration or image carousel
               Image.network(
                 'https://placehold.co/600x300/E0F2F7/007BFF?text=Healthcare+Illustration', // Placeholder illustration
                 fit: BoxFit.cover,
@@ -163,62 +246,6 @@ class DashboardPage extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  // Helper method to build feature list items
-  Widget _buildFeatureItem(BuildContext context, IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Center the features
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 28),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper method to build primary CTA buttons
-  Widget _buildCTAButton(BuildContext context, String text, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        elevation: 5,
-      ),
-      child: Text(text),
-    );
-  }
-
-  // Helper method to build outlined CTA buttons
-  Widget _buildOutlinedCTAButton(BuildContext context, String text, VoidCallback onPressed) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.primary,
-        side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-      child: Text(text),
     );
   }
 }

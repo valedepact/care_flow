@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:care_flow/screens/login_page.dart'; // Import the LoginCard widget
-import 'package:care_flow/screens/register_page.dart'; // Import the RegisterCard widget
+import 'package:care_flow/screens/login_page.dart'; // Import the LoginPage widget
+import 'package:care_flow/screens/register_page.dart'; // Updated: Import the RegisterCard widget
+import 'package:flutter/foundation.dart'; // For debugPrint
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -13,20 +14,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class MyHomePageState extends State<MyHomePage> {
-  // Although these controllers were present in your original MyHomePageState,
-  // they are actually managed within the LoginCard and RegisterCard widgets themselves.
-  // Keeping them here would be redundant unless MyHomePage was directly handling
-  // the form inputs and submission logic.
-  // final _formKey = GlobalKey<FormState>();
-  // final _usernameController = TextEditingController();
-  // final _passwordController = TextEditingController();
-  // final _fullNameController = TextEditingController();
-  // final _registerUsernameController = TextEditingController();
-  // final _registerEmailController = TextEditingController();
-  // final _registerPasswordController = TextEditingController();
-  // final _confirmPasswordController = TextEditingController();
-  // final String _selectedRole = "Nurse"; // This variable's value won't change
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,18 +41,18 @@ class MyHomePageState extends State<MyHomePage> {
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start, // Align cards at the top
-                    children: const [
-                      Expanded(child: LoginCard()),
-                      SizedBox(width: 24), // Increased spacing for larger screens
-                      Expanded(child: RegisterCard()),
+                    children: [ // Removed 'const' here
+                      Expanded(child: LoginPage()), // Changed to LoginPage()
+                      const SizedBox(width: 24), // Increased spacing for larger screens
+                      Expanded(child: RegisterCard()), // Changed to RegisterCard()
                     ],
                   );
                 } else { // For smaller screens (e.g., mobile, tablet portrait)
                   return Column(
-                    children: const [
-                      LoginCard(),
-                      SizedBox(height: 24), // Increased spacing for smaller screens
-                      RegisterCard(),
+                    children: [ // Removed 'const' here
+                      LoginPage(), // Changed to LoginPage()
+                      const SizedBox(height: 24), // Increased spacing for smaller screens
+                      RegisterCard(), // Changed to RegisterCard()
                     ],
                   );
                 }
@@ -79,7 +66,7 @@ class MyHomePageState extends State<MyHomePage> {
                 TextButton(
                   onPressed: () {
                     // Handle navigation to Terms and Conditions page
-                    debugPrint('Terms and Conditions pressed'); // Changed print to debugPrint
+                    debugPrint('Terms and Conditions pressed');
                   },
                   child: const Text("Terms and Conditions"),
                 ),
@@ -94,7 +81,7 @@ class MyHomePageState extends State<MyHomePage> {
                 TextButton(
                   onPressed: () {
                     // Handle navigation to Privacy Policy page
-                    debugPrint('Privacy Policy pressed'); // Changed print to debugPrint
+                    debugPrint('Privacy Policy pressed');
                   },
                   child: const Text("Privacy Policy"),
                 ),
@@ -115,7 +102,7 @@ class MyHomePageState extends State<MyHomePage> {
                   label: const Text("Google"),
                   onPressed: () {
                     // Handle Google login logic
-                    debugPrint('Google login pressed'); // Changed print to debugPrint
+                    debugPrint('Google login pressed');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent, // Google's brand color
@@ -132,7 +119,7 @@ class MyHomePageState extends State<MyHomePage> {
                   label: const Text("Facebook"),
                   onPressed: () {
                     // Handle Facebook login logic
-                    debugPrint('Facebook login pressed'); // Changed print to debugPrint
+                    debugPrint('Facebook login pressed');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade800, // Facebook's brand color

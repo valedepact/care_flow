@@ -1,0 +1,68 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run -d chrome
+
+## exception
+
+ExistingDartDevelopmentServiceException: DartDevelopmentServiceException: JSON-RPC error 100: Existing VM service clients prevent DDS from taking control.
+
+```
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.32.5, on Microsoft Windows [Version 10.0.19045.6093], locale en-US) [5.9s]
+    [32m•[39m Flutter version 3.32.5 on channel stable at C:\flutter\src\flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision fcf2c11572 (2 weeks ago), 2025-06-24 11:44:07 -0700
+    [32m•[39m Engine revision dd93de6fb1
+    [32m•[39m Dart version 3.8.1
+    [32m•[39m DevTools version 2.45.1
+
+[32m[✓][39m Windows Version (10 Enterprise 64-bit, 22H2, 2009) [16.4s]
+
+[32m[✓][39m Android toolchain - develop for Android devices (Android SDK version 36.0.0) [44.9s]
+    [32m•[39m Android SDK at C:\Users\Vale de Pact\AppData\Local\Android\sdk
+    [32m•[39m Platform android-36, build-tools 36.0.0
+    [32m•[39m Java binary at: C:\Program Files\Android\Android Studio\jbr\bin\java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version OpenJDK Runtime Environment (build 21.0.6+-13391695-b895.109)
+    [32m•[39m All Android licenses accepted.
+
+[32m[✓][39m Chrome - develop for the web [2.4s]
+    [32m•[39m Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[32m[✓][39m Visual Studio - develop Windows apps (Visual Studio Community 2022 17.14.7 Preview 1.0) [2.4s]
+    [32m•[39m Visual Studio at C:\Program Files\Microsoft Visual Studio\2022\Preview
+    [32m•[39m Visual Studio Community 2022 version 17.14.36221.1
+    [32m•[39m The current Visual Studio installation is a pre-release version. It may not be supported by Flutter yet.
+    [32m•[39m Windows 10 SDK version 10.0.26100.0
+
+[32m[✓][39m Android Studio (version 2025.1.1) [25ms]
+    [32m•[39m Android Studio at C:\Program Files\Android\Android Studio
+    [32m•[39m Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    [32m•[39m Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    [32m•[39m Java version OpenJDK Runtime Environment (build 21.0.6+-13391695-b895.109)
+
+[32m[✓][39m VS Code (version 1.101.2) [17ms]
+    [32m•[39m VS Code at C:\Users\Vale de Pact\AppData\Local\Programs\Microsoft VS Code
+    [32m•[39m Flutter extension can be installed from:
+      🔨 https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter
+
+[32m[✓][39m Connected device (3 available) [753ms]
+    [32m•[39m Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.19045.6093]
+    [32m•[39m Chrome (web)      • chrome  • web-javascript • Google Chrome 138.0.7204.101
+    [32m•[39m Edge (web)        • edge    • web-javascript • Microsoft Edge 138.0.3351.77
+
+[32m[✓][39m Network resources [1,403ms]
+    [32m•[39m All expected network resources are available.
+
+[32m•[39m No issues found!
+```

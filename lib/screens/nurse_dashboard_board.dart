@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/screens/visit_schedule_page.dart';
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
-// Import the new MyAlertsScreen (for viewing)
 import 'package:care_flow/screens/add_appointment_screen.dart'; // Import the AddAppointmentScreen
 import 'package:care_flow/screens/add_patient_screen.dart'; // Import the AddPatientScreen
 import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
@@ -16,7 +15,6 @@ import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Impor
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:intl/intl.dart'; // For date formatting
-// For debugPrint
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -49,6 +47,8 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
             .doc(currentUser.uid)
             .get();
 
+        if (!mounted) return; // Check mounted after await
+
         if (userDoc.exists) {
           setState(() {
             _nurseName = userDoc.get('fullName') ?? 'Caregiver';
@@ -56,14 +56,14 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           });
           await _fetchUpcomingVisits(currentUser.uid); // Fetch visits after nurse data is loaded
         } else {
-          debugPrint('Nurse document not found for UID: ${currentUser.uid}'); // Changed print to debugPrint
+          debugPrint('Nurse document not found for UID: ${currentUser.uid}');
           setState(() {
             _nurseName = 'Caregiver (Profile Incomplete)';
             _isLoading = false;
           });
         }
       } catch (e) {
-        debugPrint('Error fetching nurse data: $e'); // Changed print to debugPrint
+        debugPrint('Error fetching nurse data: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error loading nurse data: $e')),
@@ -88,6 +88,9 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   Future<void> _fetchPatients() async {
     try {
       QuerySnapshot patientSnapshot = await FirebaseFirestore.instance.collection('patients').get();
+
+      if (!mounted) return; // Check mounted after await
+
       List<Patient> fetchedPatients = patientSnapshot.docs.map((doc) {
         return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
@@ -98,7 +101,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching patients: $e'); // Changed print to debugPrint
+      debugPrint('Error fetching patients: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading patients: $e')),
@@ -117,6 +120,8 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           .limit(5) // Limit to a few upcoming visits for the dashboard card
           .get();
 
+      if (!mounted) return; // Check mounted after await
+
       List<Appointment> fetchedVisits = snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         DateTime visitDateTime = (data['dateTime'] as Timestamp).toDate();
@@ -125,7 +130,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
-          type: data['type'] ?? 'General Consultation', // Ensure 'type' is retrieved
+          type: data['type'] ?? 'General Consultation', // <--- This line is crucial and confirmed present
           dateTime: visitDateTime,
           location: data['location'] ?? 'N/A',
           status: AppointmentStatus.values.firstWhere(
@@ -146,7 +151,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching upcoming visits: $e'); // Changed print to debugPrint
+      debugPrint('Error fetching upcoming visits: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading upcoming visits: $e')),
@@ -161,6 +166,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     });
     try {
       await FirebaseAuth.instance.signOut();
+      if (!mounted) return; // Check mounted after await
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -169,7 +175,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         );
       }
     } catch (e) {
-      debugPrint('Error during logout: $e'); // Changed print to debugPrint
+      debugPrint('Error during logout: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error logging out: $e')),
