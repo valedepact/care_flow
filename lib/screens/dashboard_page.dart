@@ -10,22 +10,11 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  // These variables are no longer needed in DashboardPage as it's a landing page
-  // String _patientName = 'Loading...';
-  // String _patientId = '';
-  // bool _isLoadingUserData = true; // Separate loading for user data
-  //
-  // Appointment? _upcomingAppointment; // To store the fetched upcoming appointment
-  // bool _isLoadingUpcomingAppointment = true;
-  // String _upcomingAppointmentErrorMessage = '';
 
   @override
   void initState() {
     super.initState();
     // This DashboardPage is now the initial landing page.
-    // It should not fetch patient data directly unless a user is already logged in.
-    // The main purpose here is to present login/register options.
-    // We can keep the data fetching logic for the actual PatientDashboardPage.
   }
 
   // Helper method to build primary CTA buttons

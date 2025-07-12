@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore for user data
-import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen
-import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:care_flow/screens/login_page.dart'; // Import LoginPage for navigation
 
 class RegisterCard extends StatefulWidget { // This class name MUST be RegisterCard
@@ -87,17 +85,18 @@ class _RegisterCardState extends State<RegisterCard> {
           });
         }
 
-        // If successful, navigate to the RoleRouterScreen
+        // If successful, navigate to the LoginPage
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration successful! Redirecting...'),
+              content: Text('Registration successful! Please log in.'),
               backgroundColor: Colors.green,
             ),
           );
+          // *** CHANGE HERE: Navigate to LoginPage instead of RoleRouterScreen ***
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+            MaterialPageRoute(builder: (context) => const LoginPage()),
           );
         }
       } on FirebaseAuthException catch (e) {
