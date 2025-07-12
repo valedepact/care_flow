@@ -1,73 +1,23 @@
-import 'package:flutter/material.dart'; // For Color in AppointmentStatus
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Re-defining the AppointmentStatus and Appointment classes here
-// to ensure they are available for the Patient model if needed,
-// and to clearly define related models.
-enum AppointmentStatus {
-  upcoming,
-  completed,
-  missed,
-  cancelled,
-}
-
-class Appointment {
-  final String id;
-  final String patientId;
-  final String patientName;
-  final String type; // Added 'type' field
-  final DateTime dateTime;
-  final String location;
-  final AppointmentStatus status;
-  final String notes;
-  final Color statusColor; // Added for UI representation
-
-  Appointment({
-    required this.id,
-    required this.patientId,
-    required this.patientName,
-    required this.type, // Required in constructor
-    required this.dateTime,
-    required this.location,
-    required this.status,
-    this.notes = '',
-    required this.statusColor,
-  });
-
-  // Helper to get color based on status
-  static Color getColorForStatus(AppointmentStatus status) {
-    switch (status) {
-      case AppointmentStatus.upcoming:
-        return Colors.blue.shade400;
-      case AppointmentStatus.completed:
-        return Colors.green.shade400;
-      case AppointmentStatus.missed:
-        return Colors.red.shade400;
-      case AppointmentStatus.cancelled:
-        return Colors.grey.shade400;
-    }
-  }
-}
-
-// Patient Model: Updated to include emergency contact information AND email
 class Patient {
   final String id;
   final String name;
-  final String age; // Can be '20' or '1990-01-01' (date string)
+  final String age;
   final String gender;
   final String contact;
-  final String? email; // Added email field
   final String address;
   final String condition;
-  final List<String> medications;
-  final List<String> treatmentHistory;
-  final List<String> notes; // For nurse's progress notes etc.
-  final List<String> imageUrls; // Placeholder for patient photos/documents
+  final List<dynamic> medications; // Use dynamic for lists from Firestore
+  final List<dynamic> treatmentHistory; // Use dynamic for lists from Firestore
   final String lastVisit;
-  final String? nextAppointmentId; // Optional, links to an appointment
-
-  // New fields for emergency contact
-  final String? emergencyContactName;
-  final String? emergencyContactNumber;
+  final String? email; // Nullable
+  final String? emergencyContactName; // Nullable
+  final String? emergencyContactNumber; // Nullable
+  final String? nurseId; // ID of the assigned nurse
+  final String status; // e.g., 'unassigned', 'assigned'
+  final List<dynamic> notes; // For patient-specific notes
+  final List<dynamic> imageUrls; // For storing image URLs
 
   Patient({
     required this.id,
@@ -75,59 +25,61 @@ class Patient {
     required this.age,
     required this.gender,
     required this.contact,
-    this.email, // Include in constructor
     required this.address,
     required this.condition,
-    this.medications = const [],
-    this.treatmentHistory = const [],
-    this.notes = const [],
-    this.imageUrls = const [],
-    this.lastVisit = 'N/A',
-    this.nextAppointmentId,
+    required this.medications,
+    required this.treatmentHistory,
+    required this.lastVisit,
+    this.email,
     this.emergencyContactName,
     this.emergencyContactNumber,
+    this.nurseId,
+    this.status = 'unassigned', // Default status
+    this.notes = const [],
+    this.imageUrls = const [],
   });
 
-  // Factory constructor to create a Patient from a Firestore DocumentSnapshot
   factory Patient.fromFirestore(Map<String, dynamic> data, String id) {
     return Patient(
       id: id,
-      name: data['name'] ?? '',
-      age: data['age'] ?? '',
-      gender: data['gender'] ?? '',
-      contact: data['contact'] ?? '',
-      email: data['email'], // Retrieve email from Firestore
-      address: data['address'] ?? '',
-      condition: data['condition'] ?? '',
-      medications: List<String>.from(data['medications'] ?? []),
-      treatmentHistory: List<String>.from(data['treatmentHistory'] ?? []),
-      notes: List<String>.from(data['notes'] ?? []),
-      imageUrls: List<String>.from(data['imageUrls'] ?? []),
+      name: data['name'] ?? 'Unknown Patient',
+      age: data['age'] ?? 'N/A',
+      gender: data['gender'] ?? 'N/A',
+      contact: data['contact'] ?? 'N/A',
+      address: data['address'] ?? 'N/A',
+      condition: data['condition'] ?? 'N/A',
+      medications: List<dynamic>.from(data['medications'] ?? []),
+      treatmentHistory: List<dynamic>.from(data['treatmentHistory'] ?? []),
       lastVisit: data['lastVisit'] ?? 'N/A',
-      nextAppointmentId: data['nextAppointmentId'],
+      email: data['email'],
       emergencyContactName: data['emergencyContactName'],
       emergencyContactNumber: data['emergencyContactNumber'],
+      nurseId: data['nurseId'],
+      status: data['status'] ?? 'unassigned',
+      notes: List<dynamic>.from(data['notes'] ?? []),
+      imageUrls: List<dynamic>.from(data['imageUrls'] ?? []),
     );
   }
 
-  // Method to convert Patient object to a map for Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
       'age': age,
       'gender': gender,
       'contact': contact,
-      'email': email, // Include email in Firestore map
       'address': address,
       'condition': condition,
       'medications': medications,
       'treatmentHistory': treatmentHistory,
-      'notes': notes,
-      'imageUrls': imageUrls,
       'lastVisit': lastVisit,
-      'nextAppointmentId': nextAppointmentId,
+      'email': email,
       'emergencyContactName': emergencyContactName,
       'emergencyContactNumber': emergencyContactNumber,
+      'nurseId': nurseId,
+      'status': status,
+      'notes': notes,
+      'imageUrls': imageUrls,
+      'createdAt': FieldValue.serverTimestamp(), // Add creation timestamp if not already present
     };
   }
 }

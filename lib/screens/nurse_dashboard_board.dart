@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+import 'package:intl/intl.dart'; // For date formatting
+
+import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
+
 import 'package:care_flow/screens/visit_schedule_page.dart';
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
 import 'package:care_flow/screens/add_appointment_screen.dart'; // Import the AddAppointmentScreen
@@ -13,8 +18,8 @@ import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseRep
 import 'package:care_flow/screens/nurse_navigation_screen.dart'; // Import NurseNavigationScreen
 import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Import the new NurseAlertsManagementScreen
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
-import 'package:care_flow/models/patient.dart'; // Import the Patient model
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
+import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Corrected: Import PatientPrescriptionsScreen
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -39,6 +44,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   }
 
   Future<void> _fetchNurseData() async {
+    final currentContext = context; // Capture context
     User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       try {
@@ -47,7 +53,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
             .doc(currentUser.uid)
             .get();
 
-        if (!mounted) return; // Check mounted after await
+        if (!currentContext.mounted) return; // Check mounted after await
 
         if (userDoc.exists) {
           setState(() {
@@ -64,8 +70,8 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         }
       } catch (e) {
         debugPrint('Error fetching nurse data: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
             SnackBar(content: Text('Error loading nurse data: $e')),
           );
           setState(() {
@@ -75,9 +81,9 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         }
       }
     } else {
-      if (mounted) {
+      if (currentContext.mounted) {
         Navigator.pushAndRemoveUntil(
-          context,
+          currentContext,
           MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
               (route) => false,
         );
@@ -126,22 +132,24 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         DateTime visitDateTime = (data['dateTime'] as Timestamp).toDate();
 
+        AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
+              (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+          orElse: () => AppointmentStatus.upcoming,
+        );
+
         return Appointment(
           id: doc.id,
           patientId: data['patientId'] ?? '',
           patientName: data['patientName'] ?? 'Unknown Patient',
-          type: data['type'] ?? 'General Consultation', // <--- This line is crucial and confirmed present
+          type: data['type'] ?? 'General Consultation',
           dateTime: visitDateTime,
           location: data['location'] ?? 'N/A',
-          status: AppointmentStatus.values.firstWhere(
-                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-            orElse: () => AppointmentStatus.upcoming,
-          ),
+          status: parsedStatus,
           notes: data['notes'] ?? '',
-          statusColor: Appointment.getColorForStatus(AppointmentStatus.values.firstWhere(
-                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-            orElse: () => AppointmentStatus.upcoming,
-          )),
+          assignedToId: data['assignedToId'],
+          assignedToName: data['assignedToName'],
+          createdAt: (data['createdAt'] as Timestamp).toDate(),
+          statusColor: Appointment.getColorForStatus(parsedStatus),
         );
       }).toList();
 
@@ -161,23 +169,22 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   }
 
   Future<void> _logout() async {
+    final currentContext = context; // Capture context
     setState(() {
       _isLoading = true;
     });
     try {
       await FirebaseAuth.instance.signOut();
-      if (!mounted) return; // Check mounted after await
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
-              (route) => false,
-        );
-      }
+      if (!currentContext.mounted) return; // Check mounted after await
+      Navigator.pushAndRemoveUntil(
+        currentContext,
+        MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
+            (route) => false,
+      );
     } catch (e) {
       debugPrint('Error during logout: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
           SnackBar(content: Text('Error logging out: $e')),
         );
         setState(() {
@@ -188,28 +195,29 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   }
 
   void _onItemTapped(int index) {
+    final currentContext = context; // Capture context
     setState(() {
       _selectedIndex = index;
     });
     if (index == 1) {
       Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
+        currentContext,
+        MaterialPageRoute(builder: (currentContext) => const NursePatientListScreen()),
       );
     } else if (index == 2) {
       Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
+        currentContext,
+        MaterialPageRoute(builder: (currentContext) => const NurseAppointmentsScreen()),
       );
     } else if (index == 3) {
       Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
+        currentContext,
+        MaterialPageRoute(builder: (currentContext) => const NurseNavigationScreen()),
       );
     } else if (index == 4) {
       Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
+        currentContext,
+        MaterialPageRoute(builder: (currentContext) => const NurseReportsScreen()),
       );
     }
   }
@@ -223,13 +231,13 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           IconButton(
             icon: const Icon(Icons.search_rounded),
             onPressed: () {
-              debugPrint('Search button pressed'); // Changed print to debugPrint
+              debugPrint('Search button pressed');
             },
           ),
           IconButton(
             icon: const Icon(Icons.notifications_rounded),
             onPressed: () {
-              debugPrint('Notifications button pressed'); // Changed print to debugPrint
+              debugPrint('Notifications button pressed');
             },
           ),
           IconButton(
@@ -323,7 +331,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
                         );
-                        debugPrint('View All Schedule button pressed'); // Changed print to debugPrint
+                        debugPrint('View All Schedule button pressed');
                       },
                       child: Text(
                         'View All',
@@ -349,13 +357,16 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                       label: 'Add Patient',
                       icon: Icons.person_add_rounded,
                       onPressed: () {
+                        final currentContext = context; // Capture context
                         Navigator.push(
-                          context,
+                          currentContext,
                           MaterialPageRoute(builder: (context) => const AddPatientScreen()),
                         ).then((_) {
-                          _fetchPatients();
+                          if (currentContext.mounted) { // Check mounted
+                            _fetchPatients();
+                          }
                         });
-                        debugPrint('Add Patient button pressed'); // Changed print to debugPrint
+                        debugPrint('Add Patient button pressed');
                       },
                       color: Colors.purple,
                     ),
@@ -367,7 +378,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const AddAppointmentScreen()),
                         );
-                        debugPrint('New appointment button pressed'); // Changed print to debugPrint
+                        debugPrint('New appointment button pressed');
                       },
                       color: Colors.orange,
                     ),
@@ -379,7 +390,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
                         );
-                        debugPrint('Generate Report button pressed - Navigating to reports screen'); // Changed print to debugPrint
+                        debugPrint('Generate Report button pressed - Navigating to reports screen');
                       },
                       color: Colors.teal,
                     ),
@@ -391,7 +402,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
                         );
-                        debugPrint('Navigation button pressed - Navigating to navigation screen'); // Changed print to debugPrint
+                        debugPrint('Navigation button pressed - Navigating to navigation screen');
                       },
                       color: Colors.redAccent,
                     ),
@@ -403,7 +414,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const AlertsPage()),
                         );
-                        debugPrint('Schedule Reminder button pressed'); // Changed print to debugPrint
+                        debugPrint('Schedule Reminder button pressed');
                       },
                       color: Colors.blueGrey,
                     ),
@@ -415,7 +426,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const ChatListPage()),
                         );
-                        debugPrint('Messages button pressed from Nurse Dashboard'); // Changed print to debugPrint
+                        debugPrint('Messages button pressed from Nurse Dashboard');
                       },
                       color: Colors.indigo,
                     ),
@@ -427,7 +438,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
                         );
-                        debugPrint('My Appointments button pressed from Nurse Dashboard'); // Changed print to debugPrint
+                        debugPrint('My Appointments button pressed from Nurse Dashboard');
                       },
                       color: Colors.green,
                     ),
@@ -439,7 +450,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                           context,
                           MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
                         );
-                        debugPrint('Manage Alerts pressed from Nurse Dashboard'); // Changed print to debugPrint
+                        debugPrint('Manage Alerts pressed from Nurse Dashboard');
                       },
                       color: Colors.deepPurple,
                     ),
@@ -509,8 +520,9 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                 final Patient patient = _patients[index];
                 return InkWell(
                   onTap: () {
+                    final currentContext = context; // Capture context
                     Navigator.push(
-                      context,
+                      currentContext,
                       MaterialPageRoute(
                         builder: (context) => PatientProfilePage(
                           patientId: patient.id,
@@ -518,7 +530,9 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                         ),
                       ),
                     ).then((_) {
-                      _fetchPatients();
+                      if (currentContext.mounted) { // Check mounted
+                        _fetchPatients();
+                      }
                     });
                   },
                   child: Padding(
@@ -543,9 +557,10 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                       context,
                       MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
                     ).then((_) {
+                      // No need for mounted check here as _fetchPatients itself has it.
                       _fetchPatients();
                     });
-                    debugPrint('View All Patients pressed'); // Changed print to debugPrint
+                    debugPrint('View All Patients pressed');
                   },
                   child: Text(
                     'View All Patients',
@@ -608,7 +623,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                       context,
                       MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
                     );
-                    debugPrint('View All Visits pressed'); // Changed print to debugPrint
+                    debugPrint('View All Visits pressed');
                   },
                   child: Text(
                     'View All Visits',

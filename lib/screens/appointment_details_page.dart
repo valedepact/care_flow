@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/patient.dart'; // Changed import to patient.dart
+import 'package:care_flow/models/appointment.dart'; // Corrected: Import the Appointment model
 
 class AppointmentDetailsPage extends StatelessWidget {
   final Appointment appointment; // Expect to receive an Appointment object
@@ -61,6 +61,9 @@ class AppointmentDetailsPage extends StatelessWidget {
                     _buildDetailRow(context, Icons.access_time, 'Time', DateFormat('h:mm a').format(appointment.dateTime)),
                     _buildDetailRow(context, Icons.location_on, 'Location', appointment.location),
                     _buildDetailRow(context, Icons.person, 'Patient ID', appointment.patientId),
+                    // Display assignedToName if available
+                    if (appointment.assignedToName != null && appointment.assignedToName!.isNotEmpty)
+                      _buildDetailRow(context, Icons.badge, 'Assigned To', appointment.assignedToName!),
                     if (appointment.notes.isNotEmpty)
                       _buildDetailRow(context, Icons.notes, 'Notes', appointment.notes),
                   ],
@@ -81,7 +84,7 @@ class AppointmentDetailsPage extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Reschedule functionality (dummy)')),
                         );
-                        print('Reschedule appointment ${appointment.id}');
+                        debugPrint('Reschedule appointment ${appointment.id}');
                       },
                       icon: const Icon(Icons.edit_calendar),
                       label: const Text('Reschedule'),
@@ -101,7 +104,7 @@ class AppointmentDetailsPage extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Cancel functionality (dummy)')),
                         );
-                        print('Cancel appointment ${appointment.id}');
+                        debugPrint('Cancel appointment ${appointment.id}');
                       },
                       icon: const Icon(Icons.cancel),
                       label: const Text('Cancel'),
@@ -112,9 +115,9 @@ class AppointmentDetailsPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (appointment.status == AppointmentStatus.upcoming)
-                  const SizedBox(width: 16),
                 if (appointment.status == AppointmentStatus.upcoming) // Only show mark completed for upcoming
+                  const SizedBox(width: 16),
+                if (appointment.status == AppointmentStatus.upcoming)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
@@ -122,7 +125,7 @@ class AppointmentDetailsPage extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Mark as completed functionality (dummy)')),
                         );
-                        print('Mark appointment ${appointment.id} as completed');
+                        debugPrint('Mark appointment ${appointment.id} as completed');
                       },
                       icon: const Icon(Icons.check_circle),
                       label: const Text('Mark Completed'),

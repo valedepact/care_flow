@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_flow/screens/patient_dashboard_page.dart';
-import 'package:care_flow/screens/nurse_dashboard_board.dart';
+import 'package:care_flow/screens/nurse_dashboard_board.dart'; // IMPORTANT: Ensure this path and filename are correct
 import 'package:care_flow/screens/dashboard_page.dart'; // The initial landing page
+
+// Define role constants for better maintainability and to avoid typos.
+class AppRoles {
+  static const String patient = 'Patient';
+  static const String nurse = 'Nurse';
+}
 
 class RoleRouterScreen extends StatefulWidget {
   const RoleRouterScreen({super.key});
@@ -24,15 +30,7 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
 
     if (user == null) {
       debugPrint('RoleRouter: No user logged in. Navigating to DashboardPage.');
-      // If no user is logged in, navigate to the initial DashboardPage
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const DashboardPage()),
-          );
-        }
-      });
+      _navigateToPage(const DashboardPage());
       return;
     }
 
@@ -49,70 +47,53 @@ class _RoleRouterScreenState extends State<RoleRouterScreen> {
         String? role = userDoc.get('role');
         debugPrint('RoleRouter: User document exists. Role found: $role');
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            if (role == 'Patient') {
-              debugPrint('RoleRouter: Navigating to PatientDashboardPage.');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const PatientDashboardPage()),
-              );
-            } else if (role == 'Nurse') {
-              debugPrint('RoleRouter: Navigating to CaregiverDashboard.');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const CaregiverDashboard()),
-              );
-            } else {
-              debugPrint('RoleRouter: Unknown role ($role) or incomplete profile for UID: ${user.uid}. Signing out.');
-              // Handle unknown role or incomplete profile
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Unknown role or incomplete profile. Please log in again.')),
-              );
-              FirebaseAuth.instance.signOut().then((_) {
-                if (mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DashboardPage()),
-                  );
-                }
-              });
-            }
-          }
-        });
+        if (role == AppRoles.patient) {
+          debugPrint('RoleRouter: Navigating to PatientDashboardPage.');
+          _navigateToPage(const PatientDashboardPage());
+        } else if (role == AppRoles.nurse) {
+          debugPrint('RoleRouter: Navigating to CaregiverDashboard.');
+          _navigateToPage(const CaregiverDashboard()); // IMPORTANT: This must match the class name in caregiver_dashboard.dart
+        } else {
+          debugPrint('RoleRouter: Unknown role ($role) or incomplete profile for UID: ${user.uid}. Signing out.');
+          _showSnackBarAndSignOut('Unknown role or incomplete profile. Please log in again.');
+        }
       } else {
         // User document does not exist, meaning user is authenticated but profile is not set up
         debugPrint('RoleRouter: User profile not found for UID: ${user.uid}. Signing out.');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('User profile not found. Please complete registration or log in.')),
-            );
-            FirebaseAuth.instance.signOut().then((_) {
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const DashboardPage()),
-                );
-              }
-            });
-          }
-        });
+        _showSnackBarAndSignOut('User profile not found. Please complete registration or log in.');
       }
     } catch (e) {
       debugPrint("RoleRouter: Error checking user role: $e. Navigating to DashboardPage.");
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error checking user role: $e')),
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const DashboardPage()),
-          );
-        }
-      });
+      _showSnackBarAndSignOut('Error checking user role: $e');
     }
+  }
+
+  // Helper method to navigate and ensure mounted state
+  void _navigateToPage(Widget page) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => page),
+        );
+      }
+    });
+  }
+
+  // Helper method to show snack-bar, sign out, and navigate to DashboardPage
+  void _showSnackBarAndSignOut(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+        FirebaseAuth.instance.signOut().then((_) {
+          if (mounted) {
+            _navigateToPage(const DashboardPage());
+          }
+        });
+      }
+    });
   }
 
   @override

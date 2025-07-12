@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:care_flow/screens/edit_patient_screen.dart'; // Import EditPatientScreen
-import 'package:care_flow/screens/patient_medical_records_screen.dart'; // Import MedicalRecordsScreen
-import 'package:care_flow/screens/prescriptions_page.dart'; // Import PrescriptionsPage
+import 'package:care_flow/screens/medical_records_page.dart'; // Import MedicalRecordsPage (assuming this is your patient_medical_records_screen.dart)
+import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Corrected: Import PatientPrescriptionsScreen
 import 'package:care_flow/screens/patient_notes_screen.dart'; // Import PatientNotesScreen
-// For debugPrint
 
 class PatientProfilePage extends StatefulWidget {
   final String patientId; // Required patientId
@@ -44,20 +43,18 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           .doc(widget.patientId)
           .get();
 
+      if (!mounted) return; // Check mounted after await
+
       if (doc.exists) {
-        if (mounted) {
-          setState(() {
-            _patient = Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _patient = Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+          _isLoading = false;
+        });
       } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'Patient with ID ${widget.patientId} not found.';
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _errorMessage = 'Patient with ID ${widget.patientId} not found.';
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('Error fetching patient details: $e');
@@ -83,15 +80,18 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () async {
+                final currentContext = context; // Capture context
                 // Navigate to EditPatientScreen
                 await Navigator.push(
-                  context,
+                  currentContext, // Use captured context
                   MaterialPageRoute(
                     builder: (context) => EditPatientScreen(patient: _patient!),
                   ),
                 );
                 // Refresh patient details after returning from edit screen
-                _fetchPatientDetails();
+                if (currentContext.mounted) { // Check mounted before calling _fetchPatientDetails
+                  _fetchPatientDetails();
+                }
               },
               tooltip: 'Edit Patient',
             ),
@@ -203,7 +203,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PatientMedicalRecordsScreen(
+                        builder: (context) => MedicalRecordsPage( // Using MedicalRecordsPage
                           patientId: _patient!.id,
                           patientName: _patient!.name,
                         ),
@@ -218,10 +218,11 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                   icon: Icons.medication,
                   label: 'Prescriptions',
                   onPressed: () {
+                    // Corrected: Navigate to PatientPrescriptionsScreen
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PrescriptionsPage(
+                        builder: (context) => PatientPrescriptionsScreen( // Use PatientPrescriptionsScreen
                           patientId: _patient!.id,
                           patientName: _patient!.name,
                         ),

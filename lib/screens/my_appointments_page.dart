@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:care_flow/models/patient.dart'; // Changed import to patient.dart
+import 'package:care_flow/models/appointment.dart'; // Corrected: Import the Appointment model
 import 'package:care_flow/screens/appointment_details_page.dart'; // Import the AppointmentDetailsPage
 
 class MyAppointmentsPage extends StatefulWidget {
@@ -13,77 +13,21 @@ class MyAppointmentsPage extends StatefulWidget {
 }
 
 class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
-  List<Appointment> _appointments = [];
-  bool _isLoading = true;
-  String _errorMessage = '';
   User? _currentUser;
+  String? _initialErrorMessage; // For initial user check error
 
   @override
   void initState() {
     super.initState();
-    _fetchAppointments();
+    _initializeUser();
   }
 
-  Future<void> _fetchAppointments() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
+  Future<void> _initializeUser() async {
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser == null) {
-      setState(() {
-        _errorMessage = 'User not logged in. Cannot fetch appointments.';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    try {
-      // Fetch appointments where the patientId matches the current user's UID
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('appointments')
-          .where('patientId', isEqualTo: _currentUser!.uid)
-          .orderBy('dateTime', descending: true) // Order by most recent appointments first
-          .get();
-
-      if (!mounted) return; // Check mounted after await
-
-      List<Appointment> fetchedAppointments = snapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
-
-        return Appointment(
-          id: doc.id,
-          patientId: data['patientId'] ?? '',
-          patientName: data['patientName'] ?? 'Unknown Patient',
-          type: data['type'] ?? 'General Consultation', // Assuming 'type' is now available
-          dateTime: appointmentDateTime,
-          location: data['location'] ?? 'N/A',
-          status: AppointmentStatus.values.firstWhere(
-                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-            orElse: () => AppointmentStatus.upcoming,
-          ),
-          notes: data['notes'] ?? '',
-          statusColor: Appointment.getColorForStatus(AppointmentStatus.values.firstWhere(
-                (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-            orElse: () => AppointmentStatus.upcoming,
-          )),
-        );
-      }).toList();
-
       if (mounted) {
         setState(() {
-          _appointments = fetchedAppointments;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching appointments: $e');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Error loading appointments: $e';
-          _isLoading = false;
+          _initialErrorMessage = 'User not logged in. Cannot fetch appointments.';
         });
       }
     }
@@ -91,6 +35,28 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Display error immediately if user is not logged in
+    if (_currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('My Appointments'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          elevation: 4,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              _initialErrorMessage ?? 'Please log in to view your appointments.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Appointments'),
@@ -98,109 +64,156 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-          ? Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _errorMessage,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red, fontSize: 16),
-          ),
-        ),
-      )
-          : _appointments.isEmpty
-          ? const Center(
-        child: Text('You have no appointments scheduled yet.'),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: _appointments.length,
-        itemBuilder: (context, index) {
-          final appointment = _appointments[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('appointments')
+            .where('patientId', isEqualTo: _currentUser!.uid) // Filter by current user's UID (as patient)
+            .orderBy('dateTime', descending: true) // Order by most recent appointments first
+            .snapshots(), // Use snapshots for real-time updates
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            debugPrint('Error fetching appointments stream: ${snapshot.error}');
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Error loading appointments: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 16),
+                ),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('You have no appointments scheduled yet.'),
+            );
+          }
+
+          final appointments = snapshot.data!.docs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+
+            AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
+                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+              orElse: () => AppointmentStatus.upcoming,
+            );
+
+            return Appointment(
+              id: doc.id,
+              patientId: data['patientId'] ?? '',
+              patientName: data['patientName'] ?? 'Unknown Patient',
+              type: data['type'] ?? 'General Consultation',
+              dateTime: appointmentDateTime,
+              location: data['location'] ?? 'N/A',
+              status: parsedStatus,
+              notes: data['notes'] ?? '',
+              assignedToId: data['assignedToId'], // Include assignedToId
+              assignedToName: data['assignedToName'], // Include assignedToName
+              createdAt: (data['createdAt'] as Timestamp).toDate(), // Include createdAt
+              statusColor: Appointment.getColorForStatus(parsedStatus),
+            );
+          }).toList();
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: appointments.length,
+            itemBuilder: (context, index) {
+              final appointment = appointments[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        DateFormat('MMM d, yyyy').format(appointment.dateTime),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            // Display patientName here, as this is a patient's own appointment list
+                            'With: ${appointment.assignedToName ?? 'N/A'}',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: appointment.statusColor,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              appointment.status.toString().split('.').last.toUpperCase(),
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: appointment.statusColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          appointment.status.toString().split('.').last.toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Type: ${appointment.type}', // Display the appointment type
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Date: ${DateFormat('MMM d, yyyy').format(appointment.dateTime)}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Time: ${TimeOfDay.fromDateTime(appointment.dateTime).format(context)}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Location: ${appointment.location}',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Notes: ${appointment.notes.isNotEmpty ? appointment.notes : 'N/A'}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            final currentContext = context; // Capture context
+                            // Navigate to AppointmentDetailsPage, passing the appointment object
+                            Navigator.push(
+                              currentContext,
+                              MaterialPageRoute(
+                                builder: (context) => AppointmentDetailsPage(appointment: appointment),
+                              ),
+                            );
+                            debugPrint('View details for appointment: ${appointment.id}');
+                          },
+                          icon: const Icon(Icons.info_outline),
+                          label: const Text('View Details'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                            side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Type: ${appointment.type}', // Display the appointment type
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(
-                    'Time: ${TimeOfDay.fromDateTime(appointment.dateTime).format(context)}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Location: ${appointment.location}',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Notes: ${appointment.notes.isNotEmpty ? appointment.notes : 'N/A'}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        // Navigate to AppointmentDetailsPage, passing the appointment object
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AppointmentDetailsPage(appointment: appointment),
-                          ),
-                        );
-                        print('View details for appointment: ${appointment.id}');
-                      },
-                      icon: const Icon(Icons.info_outline),
-                      label: const Text('View Details'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                        side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),

@@ -10,11 +10,22 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  // These variables are no longer needed in DashboardPage as it's a landing page
+  // String _patientName = 'Loading...';
+  // String _patientId = '';
+  // bool _isLoadingUserData = true; // Separate loading for user data
+  //
+  // Appointment? _upcomingAppointment; // To store the fetched upcoming appointment
+  // bool _isLoadingUpcomingAppointment = true;
+  // String _upcomingAppointmentErrorMessage = '';
 
   @override
   void initState() {
     super.initState();
     // This DashboardPage is now the initial landing page.
+    // It should not fetch patient data directly unless a user is already logged in.
+    // The main purpose here is to present login/register options.
+    // We can keep the data fetching logic for the actual PatientDashboardPage.
   }
 
   // Helper method to build primary CTA buttons
@@ -88,8 +99,9 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 40),
 
               // 1. Logo and System Name
-              Image.network(
-                'https://placehold.co/100x100/007BFF/FFFFFF?text=Logo', // Placeholder logo
+              // Changed from Image.network to Image.asset
+              Image.asset(
+                'assets/images/bre.png', // Path to your new logo image
                 height: 100,
                 width: 100,
                 errorBuilder: (context, error, stackTrace) => const Icon(
@@ -212,8 +224,9 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 40),
 
               // 6. Visuals (Placeholder)
-              Image.network(
-                'https://placehold.co/600x300/E0F2F7/007BFF?text=Healthcare+Illustration', // Placeholder illustration
+              // Changed from Image.network to Image.asset
+              Image.asset(
+                'assets/images/comm1.jpg', // Path to your new illustration image
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: 300,

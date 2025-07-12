@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
-// For debugPrint
+
+// Import the Patient model
+import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
 
 import 'package:care_flow/screens/emergency_alerts_page.dart';
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
-// Import the new MyAlertsScreen (for viewing)
+// import 'package:care_flow/screens/my_alerts_screen.dart'; // Import the new MyAlertsScreen (for viewing) - commented out as it's not provided yet
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
-import 'package:care_flow/models/patient.dart'; // Import the Patient model (contains Appointment model)
 import 'package:care_flow/screens/my_appointments_page.dart'; // Import MyAppointmentsPage
-import 'package:care_flow/screens/patient_medical_records_screen.dart'; // Import PatientMedicalRecordsScreen
+import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
 import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Import PatientPrescriptionsScreen
 import 'package:care_flow/screens/patient_notes_screen.dart'; // Import PatientNotesScreen
 import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
@@ -39,6 +40,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   }
 
   Future<void> _fetchPatientDataAndUpcomingAppointment() async {
+    final currentContext = context; // Capture context
     User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       try {
@@ -46,6 +48,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             .collection('users')
             .doc(currentUser.uid)
             .get();
+
+        if (!currentContext.mounted) return; // Check mounted after await
 
         if (userDoc.exists) {
           setState(() {
@@ -64,8 +68,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         await _fetchUpcomingAppointment(currentUser.uid); // Fetch upcoming appointment
       } catch (e) {
         debugPrint('Error fetching patient data: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
             SnackBar(content: Text('Error loading patient data: $e')),
           );
           setState(() {
@@ -78,12 +82,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
       }
     } else {
       // No user logged in, navigate back to login
-      if (mounted) {
+      if (currentContext.mounted) {
         // This navigation should ideally be handled by RoleRouterScreen
         // if this page is only reachable after login.
         // For now, keeping it here for immediate feedback.
         Navigator.pushReplacement(
-          context,
+          currentContext,
           MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
         );
       }
@@ -91,6 +95,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   }
 
   Future<void> _fetchUpcomingAppointment(String patientId) async {
+    final currentContext = context; // Capture context
     setState(() {
       _isLoadingUpcomingAppointment = true;
       _upcomingAppointmentErrorMessage = '';
@@ -104,31 +109,31 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           .limit(1)
           .get();
 
+      if (!currentContext.mounted) return; // Check mounted after await
+
       if (snapshot.docs.isNotEmpty) {
         Map<String, dynamic> data = snapshot.docs.first.data() as Map<String, dynamic>;
 
-        // Ensure 'type' is present in the Firestore data or provide a default
-        String appointmentType = data['type'] ?? 'General Consultation';
-
         DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+        AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
+              (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
+          orElse: () => AppointmentStatus.upcoming,
+        );
 
         setState(() {
           _upcomingAppointment = Appointment(
             id: snapshot.docs.first.id,
             patientId: data['patientId'] ?? '',
             patientName: data['patientName'] ?? 'Unknown Patient',
-            type: appointmentType, // Use the retrieved or default type
+            type: data['type'] ?? 'General Consultation',
             dateTime: appointmentDateTime,
             location: data['location'] ?? 'N/A',
-            status: AppointmentStatus.values.firstWhere(
-                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-              orElse: () => AppointmentStatus.upcoming,
-            ),
+            status: parsedStatus,
             notes: data['notes'] ?? '',
-            statusColor: Appointment.getColorForStatus(AppointmentStatus.values.firstWhere(
-                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-              orElse: () => AppointmentStatus.upcoming,
-            )),
+            assignedToId: data['assignedToId'], // Include assignedToId
+            assignedToName: data['assignedToName'], // Include assignedToName
+            createdAt: (data['createdAt'] as Timestamp).toDate(), // Include createdAt
+            statusColor: Appointment.getColorForStatus(parsedStatus),
           );
           _isLoadingUpcomingAppointment = false;
         });
@@ -140,7 +145,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
       }
     } catch (e) {
       debugPrint('Error fetching upcoming appointment: $e');
-      if (mounted) {
+      if (currentContext.mounted) {
         setState(() {
           _upcomingAppointmentErrorMessage = 'Error loading upcoming appointment: $e';
           _isLoadingUpcomingAppointment = false;
@@ -150,23 +155,24 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   }
 
   Future<void> _logout() async {
+    final currentContext = context; // Capture context
     setState(() {
       _isLoadingUserData = true; // Show loading while logging out
     });
     try {
       await FirebaseAuth.instance.signOut();
-      if (mounted) {
+      if (currentContext.mounted) {
         // After logout, navigate back to the RoleRouterScreen to handle redirection
         Navigator.pushAndRemoveUntil(
-          context,
+          currentContext,
           MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
               (route) => false,
         );
       }
     } catch (e) {
       debugPrint('Error during logout: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
           SnackBar(content: Text('Error logging out: $e')),
         );
         setState(() {
@@ -259,7 +265,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => PatientMedicalRecordsScreen(
+                            builder: (context) => MedicalRecordsPage( // Corrected: Using MedicalRecordsPage
                               patientId: _patientId,
                               patientName: _patientName,
                             ),
@@ -438,7 +444,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                           const Icon(Icons.person, color: Colors.grey, size: 24),
                           const SizedBox(width: 10),
                           Text(
-                            _upcomingAppointment!.patientName, // Display patient name from appointment
+                            // Display assignedToName (nurse's name) for patient's dashboard
+                            'With: ${_upcomingAppointment!.assignedToName ?? 'N/A'}',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ],
@@ -459,9 +466,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                         alignment: Alignment.bottomRight,
                         child: ElevatedButton.icon(
                           onPressed: () {
+                            final currentContext = context; // Capture context
                             // Navigate to AppointmentDetailsPage with the actual appointment object
                             Navigator.push(
-                              context,
+                              currentContext,
                               MaterialPageRoute(
                                 builder: (context) => AppointmentDetailsPage(appointment: _upcomingAppointment!),
                               ),

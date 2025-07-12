@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // For fetching chat data
 import 'package:firebase_auth/firebase_auth.dart'; // For current user ID
 import 'package:intl/intl.dart'; // For date formatting
-// Removed: import 'package:flutter/foundation.dart'; // debugPrint is already provided by material.dart
+import 'package:care_flow/screens/chat_screen.dart'; // Import the new ChatScreen
+import 'dart:async'; // Import for StreamSubscription
+import 'package:care_flow/screens/new_chart.dart'; // Import the SelectChatPartnerScreen
 
-// Define a simple ChatMessage model
+// Define a simple ChatMessage model (re-used from ChatScreen for consistency)
 class ChatMessage {
   final String id; // Document ID
   final String senderId;
@@ -43,7 +45,7 @@ class ChatMessage {
       'receiverId': receiverId,
       'receiverName': receiverName,
       'message': message,
-      'timestamp': timestamp,
+      'timestamp': Timestamp.fromDate(timestamp), // Convert DateTime to Timestamp
     };
   }
 }
@@ -58,21 +60,35 @@ class ChatListPage extends StatefulWidget {
 class _ChatListPageState extends State<ChatListPage> {
   User? _currentUser;
   String? _currentUserName;
-  String? _currentUserRole; // This variable is now used
+  String? _currentUserRole;
   bool _isLoading = true;
   String _errorMessage = '';
 
-  // This list will hold the "chat threads" or "conversations"
-  // Each map will represent a unique chat partner and the last message exchanged.
   List<Map<String, dynamic>> _chatThreads = [];
+
+  // Stream subscriptions for real-time updates
+  StreamSubscription? _sentMessagesSubscription;
+  StreamSubscription? _receivedMessagesSubscription;
+
+  // Store the latest snapshots from each stream
+  QuerySnapshot? _latestSentSnapshot;
+  QuerySnapshot? _latestReceivedSnapshot;
 
   @override
   void initState() {
     super.initState();
-    _initializeUserAndFetchChats();
+    _initializeUserAndListenToChats();
   }
 
-  Future<void> _initializeUserAndFetchChats() async {
+  @override
+  void dispose() {
+    // Cancel stream subscriptions to prevent memory leaks
+    _sentMessagesSubscription?.cancel();
+    _receivedMessagesSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeUserAndListenToChats() async {
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser == null) {
       setState(() {
@@ -90,14 +106,14 @@ class _ChatListPageState extends State<ChatListPage> {
 
       if (userDoc.exists) {
         _currentUserName = userDoc.get('fullName') ?? 'Unknown User';
-        _currentUserRole = userDoc.get('role'); // Get the role
+        _currentUserRole = userDoc.get('role');
       } else {
         _currentUserName = 'Unknown User';
         _currentUserRole = 'Unknown Role';
       }
-      await _fetchChatThreads();
+      _listenToChatThreads(); // Start listening to chat threads
     } catch (e) {
-      debugPrint('Error initializing user or fetching chat threads: $e');
+      debugPrint('Error initializing user or setting up chat listeners: $e');
       setState(() {
         _errorMessage = 'Failed to load user data or chat threads: $e';
         _isLoading = false;
@@ -105,29 +121,68 @@ class _ChatListPageState extends State<ChatListPage> {
     }
   }
 
-  Future<void> _fetchChatThreads() async {
+  // Use streams to listen for real-time updates to chat threads
+  void _listenToChatThreads() {
+    if (_currentUser == null) return;
+
+    // Cancel previous subscriptions if they exist
+    _sentMessagesSubscription?.cancel();
+    _receivedMessagesSubscription?.cancel();
+
+    // Initial load state
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
+    // Listen to messages sent by the current user
+    _sentMessagesSubscription = FirebaseFirestore.instance
+        .collection('messages')
+        .where('senderId', isEqualTo: _currentUser!.uid)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _latestSentSnapshot = snapshot;
+      _processCombinedSnapshots(); // Process whenever sent messages update
+    }, onError: (e) {
+      debugPrint('Stream error (sent messages): $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading sent messages: $e';
+          _isLoading = false;
+        });
+      }
+    });
+
+    // Listen to messages received by the current user
+    _receivedMessagesSubscription = FirebaseFirestore.instance
+        .collection('messages')
+        .where('receiverId', isEqualTo: _currentUser!.uid)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _latestReceivedSnapshot = snapshot;
+      _processCombinedSnapshots(); // Process whenever received messages update
+    }, onError: (e) {
+      debugPrint('Stream error (received messages): $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading received messages: $e';
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  // Helper to process combined snapshots and update chat threads
+  // Now takes no arguments, uses stored latest snapshots
+  void _processCombinedSnapshots() {
+    // Only proceed if both snapshots have been initialized at least once
+    if (_latestSentSnapshot == null || _latestReceivedSnapshot == null) {
+      return;
+    }
+
     try {
-      // Fetch messages where the current user is either the sender or the receiver.
-      // This is a simplified way to get conversations. A more robust solution
-      // would involve a dedicated 'conversations' collection with 'participants' arrays.
-      QuerySnapshot sentMessagesSnapshot = await FirebaseFirestore.instance
-          .collection('messages')
-          .where('senderId', isEqualTo: _currentUser!.uid)
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      QuerySnapshot receivedMessagesSnapshot = await FirebaseFirestore.instance
-          .collection('messages')
-          .where('receiverId', isEqualTo: _currentUser!.uid)
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      // Combine and process messages to identify unique chat partners and their last message
       Map<String, ChatMessage> latestMessagesByPartner = {};
 
       void processMessages(QuerySnapshot snapshot, bool isSender) {
@@ -142,19 +197,15 @@ class _ChatListPageState extends State<ChatListPage> {
         }
       }
 
-      processMessages(sentMessagesSnapshot, true);
-      processMessages(receivedMessagesSnapshot, false);
+      processMessages(_latestSentSnapshot!, true);
+      processMessages(_latestReceivedSnapshot!, false);
 
       List<Map<String, dynamic>> threads = latestMessagesByPartner.values.map((msg) {
-        // Determine partner name based on who the current user is
         String partnerName = (msg.senderId == _currentUser!.uid) ? msg.receiverName : msg.senderName;
         String partnerId = (msg.senderId == _currentUser!.uid) ? msg.receiverId : msg.senderId;
 
-        // For simplicity, we'll assume a message is 'unread' if it's the latest
-        // and was sent by the partner (i.e., received by current user)
-        // and its timestamp is more recent than a hypothetical 'lastRead' timestamp.
-        // A real unread count would require more complex logic (e.g., per-user read receipts).
-        bool isUnread = (msg.receiverId == _currentUser!.uid) && (msg.timestamp.isAfter(DateTime.now().subtract(const Duration(minutes: 30)))); // Dummy unread logic
+        // Dummy unread logic (as before, for a real app this needs proper backend support)
+        bool isUnread = (msg.receiverId == _currentUser!.uid) && (msg.timestamp.isAfter(DateTime.now().subtract(const Duration(minutes: 30))));
 
         return {
           'partnerName': partnerName,
@@ -165,7 +216,6 @@ class _ChatListPageState extends State<ChatListPage> {
         };
       }).toList();
 
-      // Sort threads by latest message timestamp
       threads.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
 
       if (mounted) {
@@ -175,21 +225,21 @@ class _ChatListPageState extends State<ChatListPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching chat threads: $e');
+      debugPrint('Error processing combined snapshots: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error loading chat list: $e';
+          _errorMessage = 'Error processing chat updates: $e';
           _isLoading = false;
         });
       }
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Display current user's name and role in the AppBar
         title: Text('Messages (${_currentUserName ?? "Loading..."} - ${_currentUserRole ?? "Role Unknown"})'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
@@ -226,11 +276,17 @@ class _ChatListPageState extends State<ChatListPage> {
             ),
             child: InkWell(
               onTap: () {
-                // TODO: Navigate to actual chat screen, passing partner details
-                debugPrint('Opening chat with ${thread['partnerName']} (ID: ${thread['partnerId']})');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Opening chat with ${thread['partnerName']} (Chat screen coming soon!)')),
+                // Navigate to actual chat screen, passing partner details
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      partnerId: thread['partnerId']!,
+                      partnerName: thread['partnerName']!,
+                    ),
+                  ),
                 );
+                debugPrint('Opening chat with ${thread['partnerName']} (ID: ${thread['partnerId']})');
               },
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -307,12 +363,44 @@ class _ChatListPageState extends State<ChatListPage> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // TODO: Implement logic to start a new chat (e.g., select a contact from users/patients list)
-          debugPrint('Start New Chat pressed by ${_currentUserName ?? "Unknown User"}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Start New Chat functionality coming soon!')),
+        onPressed: () async {
+          // Capture context before any async operations that might dispose the widget
+          final currentContext = context;
+
+          if (_currentUser == null || _currentUserRole == null) {
+            if (currentContext.mounted) { // Use captured context and check mounted
+              ScaffoldMessenger.of(currentContext).showSnackBar(
+                const SnackBar(content: Text('Please log in to start a new chat.')),
+              );
+            }
+            return;
+          }
+
+          final selectedPartner = await Navigator.push(
+            currentContext, // Use captured context
+            MaterialPageRoute(
+              builder: (context) => SelectChatPartnerScreen(
+                currentUserId: _currentUser!.uid,
+                currentUserRole: _currentUserRole!,
+              ),
+            ),
           );
+
+          // If a partner was selected, navigate to the ChatScreen
+          if (selectedPartner != null && selectedPartner is Map<String, dynamic>) {
+            if (currentContext.mounted) { // Use captured context and check mounted
+              Navigator.push(
+                currentContext, // Use captured context
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(
+                    partnerId: selectedPartner['id']!,
+                    partnerName: selectedPartner['name']!,
+                  ),
+                ),
+              );
+            }
+          }
+          debugPrint('Start New Chat pressed by ${_currentUserName ?? "Unknown User"}');
         },
         label: const Text('New Chat'),
         icon: const Icon(Icons.add_comment),

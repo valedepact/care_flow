@@ -34,19 +34,22 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with existing patient data
+    // Initialize controllers with existing patient data.
+    // Removed unnecessary ?. and ?? '' assuming list properties are non-nullable List<String>
     _fullNameController = TextEditingController(text: widget.patient.name);
-    _dateOfBirthController = TextEditingController(text: widget.patient.age);
+    _dateOfBirthController = TextEditingController(text: widget.patient.age); // Assuming age stores DOB string
     _contactNumberController = TextEditingController(text: widget.patient.contact);
-    _emailController = TextEditingController(text: widget.patient.email); // Use actual email if available
+    _emailController = TextEditingController(text: widget.patient.email);
     _addressController = TextEditingController(text: widget.patient.address);
     _conditionController = TextEditingController(text: widget.patient.condition);
+    // Corrected lines: Assuming medications, treatmentHistory, notes are List<String> (non-nullable)
     _medicationsController = TextEditingController(text: widget.patient.medications.join(', '));
     _treatmentHistoryController = TextEditingController(text: widget.patient.treatmentHistory.join(', '));
     _notesController = TextEditingController(text: widget.patient.notes.join('\n'));
     _lastVisitController = TextEditingController(text: widget.patient.lastVisit);
-    _emergencyContactNameController = TextEditingController(text: widget.patient.emergencyContactName);
-    _emergencyContactNumberController = TextEditingController(text: widget.patient.emergencyContactNumber);
+    // These remain with ?? '' as they are likely nullable String?
+    _emergencyContactNameController = TextEditingController(text: widget.patient.emergencyContactName ?? '');
+    _emergencyContactNumberController = TextEditingController(text: widget.patient.emergencyContactNumber ?? '');
 
     _selectedGender = widget.patient.gender;
   }
@@ -75,6 +78,7 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
+    if (!mounted) return;
     if (picked != null) {
       setState(() {
         _dateOfBirthController.text = picked.toLocal().toIso8601String().split('T')[0];
@@ -98,12 +102,14 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
           'email': _emailController.text.trim(),
           'address': _addressController.text.trim(),
           'condition': _conditionController.text.trim(),
+          // Split strings into lists, filter out empty strings
           'medications': _medicationsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
           'treatmentHistory': _treatmentHistoryController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
           'notes': _notesController.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
           'lastVisit': _lastVisitController.text.trim(),
-          'emergencyContactName': _emergencyContactNameController.text.trim(),
-          'emergencyContactNumber': _emergencyContactNumberController.text.trim(),
+          // Ensure null is saved if fields are empty, or empty string if preferred
+          'emergencyContactName': _emergencyContactNameController.text.trim().isEmpty ? null : _emergencyContactNameController.text.trim(),
+          'emergencyContactNumber': _emergencyContactNumberController.text.trim().isEmpty ? null : _emergencyContactNumberController.text.trim(),
           'updatedAt': FieldValue.serverTimestamp(), // Add an update timestamp
         };
 
@@ -113,17 +119,27 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
             .doc(widget.patient.id) // Use the existing patient's ID
             .update(updatedData);
 
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Patient ${widget.patient.name} updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Go back to the patient profile page
+      } on FirebaseException catch (e) { // Catch specific Firebase exceptions
+        debugPrint('Firebase Error updating patient: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Patient ${widget.patient.name} updated successfully!'),
-              backgroundColor: Colors.green,
+              content: Text('Failed to update patient: ${e.message}'),
+              backgroundColor: Colors.red,
             ),
           );
-          Navigator.pop(context); // Go back to the patient profile page
         }
       } catch (e) {
-        print('Error updating patient: $e');
+        debugPrint('Error updating patient: $e'); // Use debugPrint
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -218,6 +234,7 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                     _selectedGender = newValue;
                   });
                 },
+                validator: (value) => value == null ? 'Please select gender' : null, // Added validator
               ),
               const SizedBox(height: 16),
 
@@ -229,6 +246,12 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
+                validator: (value) { // Added validator
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter contact number';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -240,6 +263,12 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
+                validator: (value) { // Added optional email validation
+                  if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                    return 'Please enter a valid email address';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -251,6 +280,12 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.home),
                 ),
                 maxLines: 2,
+                validator: (value) { // Added validator
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter address';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -261,6 +296,12 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.medical_services),
                 ),
+                validator: (value) { // Added validator
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter patient condition';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -268,6 +309,7 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                 controller: _medicationsController,
                 decoration: const InputDecoration(
                   labelText: 'Medications (comma-separated)',
+                  hintText: 'e.g., Aspirin, Ibuprofen',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.medication),
                 ),
@@ -279,6 +321,7 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                 controller: _treatmentHistoryController,
                 decoration: const InputDecoration(
                   labelText: 'Treatment History (comma-separated)',
+                  hintText: 'e.g., Appendectomy (2020), Flu Shot (2023)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.history),
                 ),
@@ -289,7 +332,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
               TextFormField(
                 controller: _notesController,
                 decoration: const InputDecoration(
-                  labelText: 'Notes (e.g., nurse updates)',
+                  labelText: 'General Notes (each on new line)',
+                  hintText: 'e.g., Patient prefers morning appointments\nAllergic to penicillin',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.notes),
                 ),
@@ -300,7 +344,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
               TextFormField(
                 controller: _lastVisitController,
                 decoration: const InputDecoration(
-                  labelText: 'Last Visit Date',
+                  labelText: 'Last Visit Date (YYYY-MM-DD)',
+                  hintText: 'e.g., 2024-07-10',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.event),
                 ),
