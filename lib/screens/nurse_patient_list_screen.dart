@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth to get current nurse's UID
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:care_flow/screens/patient_profile_page.dart'; // Import PatientProfilePage
 
@@ -14,20 +15,49 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
   List<Patient> _patients = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  String? _currentNurseId; // To store the logged-in nurse's UID
 
   @override
   void initState() {
     super.initState();
-    _fetchPatients();
+    _getCurrentNurseIdAndFetchPatients(); // Combined method
+  }
+
+  // Get the current nurse's UID and then fetch their patients
+  Future<void> _getCurrentNurseIdAndFetchPatients() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _currentNurseId = user.uid;
+      debugPrint('Current Nurse ID for patient list: $_currentNurseId');
+      _fetchPatients(); // Fetch patients once nurse ID is available
+    } else {
+      debugPrint('No nurse user logged in. Cannot fetch patients.');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Please log in as a nurse to view your patients.';
+        });
+      }
+    }
   }
 
   Future<void> _fetchPatients() async {
+    if (_currentNurseId == null) {
+      debugPrint('Nurse ID is null, cannot fetch patients.');
+      return; // Should not happen if _getCurrentNurseIdAndFetchPatients is called correctly
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('patients').get();
+      // *** IMPORTANT CHANGE HERE: Filter patients by nurseId ***
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('patients')
+          .where('nurseId', isEqualTo: _currentNurseId) // Filter by current nurse's ID
+          .snapshots() // Use snapshots for real-time updates
+          .first; // Get the first snapshot to convert to Future
 
       if (!mounted) return; // Check mounted after await
 
@@ -42,7 +72,7 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching patients: $e');
+      debugPrint('Error fetching patients: $e'); // Use debugPrint
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading patients: $e';
@@ -76,7 +106,7 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
       )
           : _patients.isEmpty
           ? const Center(
-        child: Text('No patients found. Add a new patient to get started.'),
+        child: Text('You have not claimed any patients yet. Go to "Patient Management" to claim patients.'),
       )
           : ListView.builder(
         padding: const EdgeInsets.all(16.0),
@@ -102,7 +132,7 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
                   ),
                 ).then((_) {
                   // Refresh the patient list when returning from the profile/edit screen
-                  _fetchPatients();
+                  _fetchPatients(); // Re-fetch patients to ensure updated list
                 });
               },
               child: Padding(
