@@ -18,8 +18,8 @@ import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseRep
 import 'package:care_flow/screens/nurse_navigation_screen.dart'; // Import NurseNavigationScreen
 import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Import the new NurseAlertsManagementScreen
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
-import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
-import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Corrected: Import PatientPrescriptionsScreen
+//import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
+//import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Corrected: Import PatientPrescriptionsScreen
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
