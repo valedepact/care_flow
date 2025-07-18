@@ -17,3 +17,4 @@ samples, guidance on mobile development, and a full API reference.
 https://github.com/valedepact/care_flow/blob/main/home.jpg?raw=true
 https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
 https://github.com/valedepact/care_flow/blob/main/patient%20management.jpg?raw=true
+https://github.com/valedepact/care_flow/blob/main/dashboard.jpg?raw=true
