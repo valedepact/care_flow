@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:intl/intl.dart'; // For date formatting
 
 class EditPatientScreen extends StatefulWidget {
   final Patient patient; // The patient object to be edited
@@ -14,7 +15,7 @@ class EditPatientScreen extends StatefulWidget {
 class _EditPatientScreenState extends State<EditPatientScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late TextEditingController _fullNameController;
-  late TextEditingController _dateOfBirthController;
+  late TextEditingController _dateOfBirthController; // For DOB string input
   late TextEditingController _contactNumberController;
   late TextEditingController _emailController;
   late TextEditingController _addressController;
@@ -35,19 +36,18 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
   void initState() {
     super.initState();
     // Initialize controllers with existing patient data.
-    // Removed unnecessary ?. and ?? '' assuming list properties are non-nullable List<String>
     _fullNameController = TextEditingController(text: widget.patient.name);
-    _dateOfBirthController = TextEditingController(text: widget.patient.age); // Assuming age stores DOB string
+    _dateOfBirthController = TextEditingController(
+      text: widget.patient.dob != null ? DateFormat('yyyy-MM-dd').format(widget.patient.dob!) : '',
+    );
     _contactNumberController = TextEditingController(text: widget.patient.contact);
     _emailController = TextEditingController(text: widget.patient.email);
     _addressController = TextEditingController(text: widget.patient.address);
     _conditionController = TextEditingController(text: widget.patient.condition);
-    // Corrected lines: Assuming medications, treatmentHistory, notes are List<String> (non-nullable)
     _medicationsController = TextEditingController(text: widget.patient.medications.join(', '));
     _treatmentHistoryController = TextEditingController(text: widget.patient.treatmentHistory.join(', '));
     _notesController = TextEditingController(text: widget.patient.notes.join('\n'));
     _lastVisitController = TextEditingController(text: widget.patient.lastVisit);
-    // These remain with ?? '' as they are likely nullable String?
     _emergencyContactNameController = TextEditingController(text: widget.patient.emergencyContactName ?? '');
     _emergencyContactNumberController = TextEditingController(text: widget.patient.emergencyContactNumber ?? '');
 
@@ -74,14 +74,16 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
   Future<void> _selectDateOfBirth(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(_dateOfBirthController.text) ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
+      initialDate: _dateOfBirthController.text.isNotEmpty
+          ? DateTime.tryParse(_dateOfBirthController.text) ?? DateTime.now().subtract(const Duration(days: 365 * 20))
+          : DateTime.now().subtract(const Duration(days: 365 * 20)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
     if (!mounted) return;
     if (picked != null) {
       setState(() {
-        _dateOfBirthController.text = picked.toLocal().toIso8601String().split('T')[0];
+        _dateOfBirthController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
@@ -93,10 +95,22 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
       });
 
       try {
+        DateTime? dob;
+        int? age;
+        if (_dateOfBirthController.text.isNotEmpty) {
+          dob = DateTime.parse(_dateOfBirthController.text);
+          DateTime today = DateTime.now();
+          age = today.year - dob.year;
+          if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+            age--;
+          }
+        }
+
         // Create a map of updated patient data
         Map<String, dynamic> updatedData = {
           'name': _fullNameController.text.trim(),
-          'age': _dateOfBirthController.text.trim(),
+          'dob': dob != null ? Timestamp.fromDate(dob) : null, // Store DOB as Timestamp
+          'age': age, // Store calculated age
           'gender': _selectedGender ?? 'N/A',
           'contact': _contactNumberController.text.trim(),
           'email': _emailController.text.trim(),
@@ -189,6 +203,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person),
                 ),
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter full name';
@@ -202,7 +218,7 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                 onTap: () => _selectDateOfBirth(context),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: 'Date of Birth',
+                    labelText: 'Date of Birth (YYYY-MM-DD)',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.calendar_today),
                   ),
@@ -233,8 +249,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   setState(() {
                     _selectedGender = newValue;
                   });
+                  FocusScope.of(context).nextFocus();
                 },
-                validator: (value) => value == null ? 'Please select gender' : null, // Added validator
+                validator: (value) => value == null ? 'Please select gender' : null,
               ),
               const SizedBox(height: 16),
 
@@ -246,9 +263,14 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) { // Added validator
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter contact number';
+                  }
+                  if (!RegExp(r'^[0-9]+$').hasMatch(value) || value.length < 10) {
+                    return 'Please enter a valid 10-digit phone number';
                   }
                   return null;
                 },
@@ -263,7 +285,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) { // Added optional email validation
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Please enter a valid email address';
                   }
@@ -280,7 +304,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.home),
                 ),
                 maxLines: 2,
-                validator: (value) { // Added validator
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter address';
                   }
@@ -296,7 +322,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.medical_services),
                 ),
-                validator: (value) { // Added validator
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter patient condition';
                   }
@@ -314,6 +342,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.medication),
                 ),
                 maxLines: 3,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
               ),
               const SizedBox(height: 16),
 
@@ -326,6 +356,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.history),
                 ),
                 maxLines: 3,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
               ),
               const SizedBox(height: 16),
 
@@ -338,6 +370,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.notes),
                 ),
                 maxLines: 5,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
               ),
               const SizedBox(height: 16),
 
@@ -349,6 +383,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.event),
                 ),
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
               ),
               const SizedBox(height: 24),
 
@@ -369,6 +405,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_add),
                 ),
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
               ),
               const SizedBox(height: 16),
 
@@ -380,6 +418,8 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                   prefixIcon: Icon(Icons.phone_in_talk),
                 ),
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _updatePatient(), // Submit form on done
               ),
               const SizedBox(height: 40),
 

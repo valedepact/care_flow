@@ -70,20 +70,22 @@ class _SelectChatPartnerScreenState extends State<SelectChatPartnerScreen> {
       });
     }
 
-    // 2. Fetch all other nurses (excluding the current nurse)
+    // 2. Fetch all nurses and filter out the current nurse in Dart code
     QuerySnapshot nursesSnapshot = await FirebaseFirestore.instance
         .collection('users')
         .where('role', isEqualTo: 'Nurse')
-        .where(FieldPath.documentId, isNotEqualTo: widget.currentUserId)
-        .get();
+        .get(); // Fetch all nurses first
 
     for (var doc in nursesSnapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      partners.add({
-        'id': doc.id,
-        'name': data['fullName'] ?? 'Unknown Nurse',
-        'role': 'Nurse',
-      });
+      // Filter out the current nurse here
+      if (doc.id != widget.currentUserId) {
+        final data = doc.data() as Map<String, dynamic>;
+        partners.add({
+          'id': doc.id,
+          'name': data['fullName'] ?? 'Unknown Nurse',
+          'role': 'Nurse',
+        });
+      }
     }
 
     // Remove duplicates if any (e.g., if a nurse is also listed as a patient for some reason, though unlikely)

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-// For debugPrint
 
 class NurseNavigationScreen extends StatefulWidget {
   const NurseNavigationScreen({super.key});
@@ -24,6 +23,7 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    final currentContext = context; // Capture context
     setState(() {
       _isLoadingMap = true;
       _mapErrorMessage = '';
@@ -31,6 +31,8 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
     try {
       // Request location permissions
       LocationPermission permission = await Geolocator.requestPermission();
+      if (!currentContext.mounted) return; // Check mounted after await
+
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         setState(() {
           _mapErrorMessage = 'Location permissions are denied. Please enable them in your device settings to use the map.';
@@ -42,10 +44,12 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() {
-          _mapErrorMessage = 'Location services are disabled. Please enable them to use the map.';
-          _isLoadingMap = false;
-        });
+        if (currentContext.mounted) {
+          setState(() {
+            _mapErrorMessage = 'Location services are disabled. Please enable them to use the map.';
+            _isLoadingMap = false;
+          });
+        }
         return;
       }
 
@@ -54,15 +58,22 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
         desiredAccuracy: LocationAccuracy.high, // High accuracy for navigation
       );
 
-      if (mounted) {
-        setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
-          _isLoadingMap = false;
-        });
+      if (!currentContext.mounted) return; // Check mounted again after position fetch
+
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _isLoadingMap = false;
+      });
+
+      // If map controller is already initialized, move camera to current location
+      if (_mapController != null && _currentLocation != null) {
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(_currentLocation!, 14.0),
+        );
       }
     } catch (e) {
       debugPrint('Error getting current location: $e');
-      if (mounted) {
+      if (currentContext.mounted) {
         setState(() {
           _mapErrorMessage = 'Failed to get current location: ${e.toString()}. Please ensure location services are on and permissions are granted.';
           _isLoadingMap = false;
@@ -73,15 +84,21 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    // Dummy usage to satisfy the linter, _mapController will be used for actual map control later.
+    // If current location is already available, animate camera to it
+    if (_currentLocation != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentLocation!, 14.0),
+      );
+    }
     debugPrint('GoogleMapController initialized: $_mapController');
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Patient Navigation'),
+        title: const Text('Nurse Navigation'),
         backgroundColor: Colors.redAccent.shade700,
         foregroundColor: Colors.white,
         elevation: 4,
@@ -124,19 +141,20 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
                 GoogleMap(
                   onMapCreated: _onMapCreated,
                   initialCameraPosition: CameraPosition(
-                    target: _currentLocation!, // Use current location
+                    target: _currentLocation ?? const LatLng(0, 0), // Use current location, default to (0,0) if null
                     zoom: 14.0, // Initial zoom level
                   ),
                   myLocationEnabled: true, // Show user's current location dot
                   myLocationButtonEnabled: true, // Show button to recenter on user
                   markers: {
                     // Add a marker for the current location
-                    Marker(
-                      markerId: const MarkerId('currentLocation'),
-                      position: _currentLocation!,
-                      infoWindow: const InfoWindow(title: 'My Location'),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                    ),
+                    if (_currentLocation != null) // Only add if location is available
+                      Marker(
+                        markerId: const MarkerId('currentLocation'),
+                        position: _currentLocation!,
+                        infoWindow: const InfoWindow(title: 'My Location'),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                      ),
                     // TODO: Add patient location markers here (fetch from Firestore)
                     // Example:
                     // Marker(
@@ -157,7 +175,9 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Text(
-                        'Current Location: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}',
+                        _currentLocation != null
+                            ? 'Current Location: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}'
+                            : 'Getting location...',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
                       ),

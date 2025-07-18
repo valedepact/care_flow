@@ -6,6 +6,7 @@ import 'package:intl/intl.dart'; // For date formatting
 // Re-using the ChatMessage model from messaging_page.dart for consistency
 class ChatMessage {
   final String id; // Document ID
+  final String chatRoomId; // New: ID for the chat conversation
   final String senderId;
   final String senderName;
   final String receiverId; // The ID of the other participant
@@ -15,6 +16,7 @@ class ChatMessage {
 
   ChatMessage({
     required this.id,
+    required this.chatRoomId, // New: Required in constructor
     required this.senderId,
     required this.senderName,
     required this.receiverId,
@@ -26,6 +28,7 @@ class ChatMessage {
   factory ChatMessage.fromFirestore(Map<String, dynamic> data, String id) {
     return ChatMessage(
       id: id,
+      chatRoomId: data['chatRoomId'] ?? '', // New: Parse chatRoomId
       senderId: data['senderId'] ?? '',
       senderName: data['senderName'] ?? 'Unknown Sender',
       receiverId: data['receiverId'] ?? '',
@@ -37,6 +40,7 @@ class ChatMessage {
 
   Map<String, dynamic> toFirestore() {
     return {
+      'chatRoomId': chatRoomId, // New: Include chatRoomId
       'senderId': senderId,
       'senderName': senderName,
       'receiverId': receiverId,
@@ -50,11 +54,13 @@ class ChatMessage {
 class ChatScreen extends StatefulWidget {
   final String partnerId;
   final String partnerName;
+  final String chatRoomId; // NEW: Add chatRoomId to the constructor
 
   const ChatScreen({
     super.key,
     required this.partnerId,
     required this.partnerName,
+    required this.chatRoomId, // NEW: Make it required
   });
 
   @override
@@ -66,17 +72,20 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   User? _currentUser;
   String? _currentUserName; // Full name of the current user
+  // Removed _chatRoomId from state as it's now passed via widget
 
   @override
   void initState() {
     super.initState();
-    _initializeCurrentUser();
+    _initializeCurrentUser(); // Initialize current user and their full name
   }
 
   // Initialize current user and their full name
   Future<void> _initializeCurrentUser() async {
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser != null) {
+      debugPrint('Chat Room ID from widget: ${widget.chatRoomId}'); // Debug print
+
       try {
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
@@ -122,6 +131,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final ChatMessage newMessage = ChatMessage(
         id: '', // Firestore will generate this
+        chatRoomId: widget.chatRoomId, // Use the chat room ID from the widget
         senderId: _currentUser!.uid,
         senderName: _currentUserName!,
         receiverId: widget.partnerId,
@@ -131,14 +141,19 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       await FirebaseFirestore.instance.collection('messages').add(newMessage.toFirestore());
-      debugPrint('Message sent: $messageText to ${widget.partnerName}');
+      debugPrint('Message sent: "$messageText" in chat room ${widget.chatRoomId}');
 
       // Scroll to the bottom after sending a message
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      // Add a small delay to allow message to render before scrolling
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     } catch (e) {
       debugPrint('Error sending message: $e');
       if (mounted) {
@@ -151,6 +166,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure _currentUser is initialized before building StreamBuilder
+    if (_currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.partnerName),
+          backgroundColor: Colors.indigo.shade700,
+          foregroundColor: Colors.white,
+          elevation: 4,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.partnerName), // Display the name of the chat partner
@@ -164,8 +192,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('messages')
-                  .where('senderId', whereIn: [_currentUser?.uid, widget.partnerId])
-                  .where('receiverId', whereIn: [_currentUser?.uid, widget.partnerId])
+                  .where('chatRoomId', isEqualTo: widget.chatRoomId) // Query by chatRoomId from widget
                   .orderBy('timestamp', descending: false) // Order by timestamp ascending
                   .snapshots(),
               builder: (context, snapshot) {
@@ -180,15 +207,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   return const Center(child: Text('Say hello! No messages yet.'));
                 }
 
-                // Filter messages to ensure they are strictly between the two participants
-                // Firestore's `whereIn` is for OR conditions, so we need to filter further.
                 final messages = snapshot.data!.docs.map((doc) {
                   return ChatMessage.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
-                }).where((msg) {
-                  final bool isBetweenCurrentAndPartner =
-                      (msg.senderId == _currentUser!.uid && msg.receiverId == widget.partnerId) ||
-                          (msg.senderId == widget.partnerId && msg.receiverId == _currentUser!.uid);
-                  return isBetweenCurrentAndPartner;
                 }).toList();
 
                 // Scroll to the bottom when new messages arrive

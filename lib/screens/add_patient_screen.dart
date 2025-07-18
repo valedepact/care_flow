@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth to get current nurse's UID
+import 'package:intl/intl.dart'; // For date formatting
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key});
@@ -27,7 +28,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
   final List<String> _genders = ['Male', 'Female', 'Other'];
 
   // For 'Claim Patient' tab
-  bool _isLoadingClaimPatient = false; // Loading for claiming patient
+  // Replaced single boolean with a Set for per-patient loading state
+  final Set<String> _loadingClaimingIds = {};
   String? _currentNurseId; // To store the logged-in nurse's UID
 
   // Tab Controller
@@ -50,7 +52,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
       debugPrint('Current Nurse ID: $_currentNurseId');
     } else {
       debugPrint('No nurse user logged in.');
-      // Optionally, navigate back to login or show an error if no user is logged in
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No nurse logged in. Please log in to claim patients.')),
@@ -76,14 +77,17 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
   Future<void> _selectDateOfBirth(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)), // Default to 20 years ago
+      // Pre-fill with existing date if available, otherwise default to 20 years ago
+      initialDate: _dateOfBirthController.text.isNotEmpty
+          ? DateTime.tryParse(_dateOfBirthController.text) ?? DateTime.now().subtract(const Duration(days: 365 * 20))
+          : DateTime.now().subtract(const Duration(days: 365 * 20)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
     if (!mounted) return;
     if (picked != null) {
       setState(() {
-        _dateOfBirthController.text = picked.toLocal().toIso8601String().split('T')[0];
+        _dateOfBirthController.text = DateFormat('yyyy-MM-dd').format(picked); // Format for display
       });
     }
   }
@@ -95,10 +99,22 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
       });
 
       try {
+        DateTime? dob;
+        int? age;
+        if (_dateOfBirthController.text.isNotEmpty) {
+          dob = DateTime.parse(_dateOfBirthController.text);
+          DateTime today = DateTime.now();
+          age = today.year - dob.year;
+          if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+            age--;
+          }
+        }
+
         // Create a map of patient data to save to Firestore
         Map<String, dynamic> patientData = {
           'name': _fullNameController.text.trim(),
-          'age': _dateOfBirthController.text.trim(), // Storing DOB as age string for now
+          'dob': dob != null ? Timestamp.fromDate(dob) : null, // Store DOB as Timestamp
+          'age': age, // Store calculated age
           'gender': _selectedGender ?? 'N/A',
           'contact': _contactNumberController.text.trim(),
           'email': _emailController.text.trim(),
@@ -118,7 +134,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
         };
 
         // Add the patient data to the 'patients' collection in Firestore
-        await FirebaseFirestore.instance.collection('patients').add(patientData);
+        final docRef = await FirebaseFirestore.instance.collection('patients').add(patientData);
+        debugPrint('Patient added with ID: ${docRef.id}'); // Log new document ID
 
         if (!mounted) return;
 
@@ -128,7 +145,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
             backgroundColor: Colors.green,
           ),
         );
-        // Clear fields after adding
+        // Clear fields and reset form state after adding
         _fullNameController.clear();
         _dateOfBirthController.clear();
         _contactNumberController.clear();
@@ -139,6 +156,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
         _emergencyContactNumberController.clear();
         setState(() {
           _selectedGender = null;
+          _addPatientFormKey.currentState?.reset(); // Reset form validation state
         });
       } catch (e) {
         debugPrint('Error adding patient: $e');
@@ -172,7 +190,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
     }
 
     setState(() {
-      _isLoadingClaimPatient = true; // Start loading for claiming
+      _loadingClaimingIds.add(patientDocId); // Add patient ID to loading set
     });
 
     try {
@@ -202,7 +220,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
     } finally {
       if (mounted) {
         setState(() {
-          _isLoadingClaimPatient = false; // Stop loading
+          _loadingClaimingIds.remove(patientDocId); // Remove patient ID from loading set
         });
       }
     }
@@ -234,6 +252,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person),
               ),
+              textInputAction: TextInputAction.next, // Next action
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter full name';
@@ -248,14 +268,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
               onTap: () => _selectDateOfBirth(context),
               child: InputDecorator(
                 decoration: const InputDecoration(
-                  labelText: 'Date of Birth',
+                  labelText: 'Date of Birth (YYYY-MM-DD)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.calendar_today),
                 ),
                 child: Text(
                   _dateOfBirthController.text.isEmpty
                       ? 'Select Date'
-                      : _dateOfBirthController.text, // Corrected line
+                      : _dateOfBirthController.text,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -280,6 +300,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 setState(() {
                   _selectedGender = newValue;
                 });
+                FocusScope.of(context).nextFocus(); // Move focus after selection
               },
               validator: (value) => value == null ? 'Please select gender' : null,
             ),
@@ -294,9 +315,15 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.phone),
               ),
               keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter contact number';
+                }
+                // Basic phone number validation (digits only, min length)
+                if (!RegExp(r'^[0-9]+$').hasMatch(value) || value.length < 10) {
+                  return 'Please enter a valid 10-digit phone number';
                 }
                 return null;
               },
@@ -312,6 +339,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.email),
               ),
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+              validator: (value) {
+                if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                  return 'Please enter a valid email address';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 
@@ -324,6 +359,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.home),
               ),
               maxLines: 2,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter address';
@@ -343,6 +380,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.medical_services),
               ),
               maxLines: 2,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 24),
 
@@ -363,6 +402,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person_add),
               ),
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 16),
 
@@ -374,6 +415,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.phone_in_talk),
               ),
               keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done, // Last field, so 'done'
+              onFieldSubmitted: (_) => _addPatient(), // Submit form on done
             ),
             const SizedBox(height: 40),
 
@@ -450,6 +493,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                   final patientData = patientDoc.data() as Map<String, dynamic>;
                   final patientName = patientData['name'] ?? 'Unknown Patient';
                   final patientCondition = patientData['condition'] ?? 'N/A';
+                  final patientId = patientDoc.id; // Get the patient's document ID
+
+                  // Check if this specific patient's claim button is loading
+                  final bool isClaiming = _loadingClaimingIds.contains(patientId);
 
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -469,10 +516,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text('Condition: $patientCondition'),
-                      trailing: _isLoadingClaimPatient
+                      trailing: isClaiming // Use per-patient loading state
                           ? const CircularProgressIndicator()
                           : ElevatedButton(
-                        onPressed: () => _claimPatient(patientDoc.id),
+                        onPressed: () => _claimPatient(patientId), // Pass the patient ID
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,

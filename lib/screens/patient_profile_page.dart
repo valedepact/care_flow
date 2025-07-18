@@ -168,7 +168,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
               context,
               children: [
                 _buildInfoRow(Icons.medical_services, 'Condition', _patient!.condition),
-                _buildInfoRow(Icons.calendar_today, 'Age', _patient!.age),
+                _buildInfoRow(Icons.calendar_today, 'Age', _patient!.age as String),
                 _buildInfoRow(Icons.wc, 'Gender', _patient!.gender),
                 _buildInfoRow(Icons.medication, 'Medications', _patient!.medications.join(', ')),
                 _buildInfoRow(Icons.history, 'Treatment History', _patient!.treatmentHistory.join(', ')),

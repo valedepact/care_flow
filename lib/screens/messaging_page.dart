@@ -4,11 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart'; // For current user ID
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:care_flow/screens/chat_screen.dart'; // Import the new ChatScreen
 import 'dart:async'; // Import for StreamSubscription
-import 'package:care_flow/screens/new_chart.dart'; // Import the SelectChatPartnerScreen
+import 'package:care_flow/screens/new_chart.dart'; // Corrected Import
 
 // Define a simple ChatMessage model (re-used from ChatScreen for consistency)
 class ChatMessage {
   final String id; // Document ID
+  final String chatRoomId; // New: ID for the chat conversation
   final String senderId;
   final String senderName;
   final String receiverId; // The ID of the other participant
@@ -18,6 +19,7 @@ class ChatMessage {
 
   ChatMessage({
     required this.id,
+    required this.chatRoomId, // New: Required in constructor
     required this.senderId,
     required this.senderName,
     required this.receiverId,
@@ -29,6 +31,7 @@ class ChatMessage {
   factory ChatMessage.fromFirestore(Map<String, dynamic> data, String id) {
     return ChatMessage(
       id: id,
+      chatRoomId: data['chatRoomId'] ?? '', // New: Parse chatRoomId
       senderId: data['senderId'] ?? '',
       senderName: data['senderName'] ?? 'Unknown Sender',
       receiverId: data['receiverId'] ?? '',
@@ -40,6 +43,7 @@ class ChatMessage {
 
   Map<String, dynamic> toFirestore() {
     return {
+      'chatRoomId': chatRoomId, // New: Include chatRoomId
       'senderId': senderId,
       'senderName': senderName,
       'receiverId': receiverId,
@@ -88,6 +92,15 @@ class _ChatListPageState extends State<ChatListPage> {
     super.dispose();
   }
 
+  // Generates a consistent chatRoomId by sorting and concatenating user IDs
+  String _generateChatRoomId(String user1Id, String user2Id) {
+    List<String> ids = [user1Id, user2Id];
+    ids.sort(); // Sorts alphabetically to ensure consistent order
+    String generatedId = ids.join('_');
+    debugPrint('ChatListPage: _generateChatRoomId: IDs: $user1Id, $user2Id -> Generated: $generatedId');
+    return generatedId;
+  }
+
   Future<void> _initializeUserAndListenToChats() async {
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser == null) {
@@ -95,8 +108,11 @@ class _ChatListPageState extends State<ChatListPage> {
         _errorMessage = 'User not logged in. Cannot fetch messages.';
         _isLoading = false;
       });
+      debugPrint('ChatListPage: No current user. Setting error message.');
       return;
     }
+
+    debugPrint('ChatListPage: Current User UID: ${_currentUser!.uid}');
 
     try {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -107,13 +123,15 @@ class _ChatListPageState extends State<ChatListPage> {
       if (userDoc.exists) {
         _currentUserName = userDoc.get('fullName') ?? 'Unknown User';
         _currentUserRole = userDoc.get('role');
+        debugPrint('ChatListPage: User Name: $_currentUserName, Role: $_currentUserRole');
       } else {
         _currentUserName = 'Unknown User';
         _currentUserRole = 'Unknown Role';
+        debugPrint('ChatListPage: User document not found for UID: ${_currentUser!.uid}');
       }
       _listenToChatThreads(); // Start listening to chat threads
     } catch (e) {
-      debugPrint('Error initializing user or setting up chat listeners: $e');
+      debugPrint('ChatListPage: Error initializing user or setting up chat listeners: $e');
       setState(() {
         _errorMessage = 'Failed to load user data or chat threads: $e';
         _isLoading = false;
@@ -134,6 +152,7 @@ class _ChatListPageState extends State<ChatListPage> {
       _isLoading = true;
       _errorMessage = '';
     });
+    debugPrint('ChatListPage: Starting to listen to chat threads for UID: ${_currentUser!.uid}');
 
     // Listen to messages sent by the current user
     _sentMessagesSubscription = FirebaseFirestore.instance
@@ -143,9 +162,10 @@ class _ChatListPageState extends State<ChatListPage> {
         .snapshots()
         .listen((snapshot) {
       _latestSentSnapshot = snapshot;
+      debugPrint('ChatListPage: Received new sent messages snapshot. Docs: ${snapshot.docs.length}');
       _processCombinedSnapshots(); // Process whenever sent messages update
     }, onError: (e) {
-      debugPrint('Stream error (sent messages): $e');
+      debugPrint('ChatListPage: Stream error (sent messages): $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading sent messages: $e';
@@ -162,9 +182,10 @@ class _ChatListPageState extends State<ChatListPage> {
         .snapshots()
         .listen((snapshot) {
       _latestReceivedSnapshot = snapshot;
+      debugPrint('ChatListPage: Received new received messages snapshot. Docs: ${snapshot.docs.length}');
       _processCombinedSnapshots(); // Process whenever received messages update
     }, onError: (e) {
-      debugPrint('Stream error (received messages): $e');
+      debugPrint('ChatListPage: Stream error (received messages): $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading received messages: $e';
@@ -179,8 +200,10 @@ class _ChatListPageState extends State<ChatListPage> {
   void _processCombinedSnapshots() {
     // Only proceed if both snapshots have been initialized at least once
     if (_latestSentSnapshot == null || _latestReceivedSnapshot == null) {
+      debugPrint('ChatListPage: _processCombinedSnapshots: Waiting for both snapshots to load.');
       return;
     }
+    debugPrint('ChatListPage: _processCombinedSnapshots: Processing combined snapshots.');
 
     try {
       Map<String, ChatMessage> latestMessagesByPartner = {};
@@ -190,9 +213,12 @@ class _ChatListPageState extends State<ChatListPage> {
           ChatMessage message = ChatMessage.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
           String partnerId = isSender ? message.receiverId : message.senderId;
 
+          debugPrint('ChatListPage: Processing message ID: ${message.id}, chatRoomId: ${message.chatRoomId}, Sender: ${message.senderId}, Receiver: ${message.receiverId}, Partner ID: $partnerId');
+
           if (!latestMessagesByPartner.containsKey(partnerId) ||
               message.timestamp.isAfter(latestMessagesByPartner[partnerId]!.timestamp)) {
             latestMessagesByPartner[partnerId] = message;
+            debugPrint('ChatListPage: Updated latest message for partner $partnerId.');
           }
         }
       }
@@ -203,6 +229,9 @@ class _ChatListPageState extends State<ChatListPage> {
       List<Map<String, dynamic>> threads = latestMessagesByPartner.values.map((msg) {
         String partnerName = (msg.senderId == _currentUser!.uid) ? msg.receiverName : msg.senderName;
         String partnerId = (msg.senderId == _currentUser!.uid) ? msg.receiverId : msg.senderId;
+        String chatRoomId = _generateChatRoomId(_currentUser!.uid, partnerId); // Generate chatRoomId here
+
+        debugPrint('ChatListPage: Thread for Partner: $partnerName (ID: $partnerId), Generated chatRoomId: $chatRoomId');
 
         // Dummy unread logic (as before, for a real app this needs proper backend support)
         bool isUnread = (msg.receiverId == _currentUser!.uid) && (msg.timestamp.isAfter(DateTime.now().subtract(const Duration(minutes: 30))));
@@ -212,6 +241,7 @@ class _ChatListPageState extends State<ChatListPage> {
           'lastMessage': msg.message,
           'timestamp': msg.timestamp,
           'partnerId': partnerId,
+          'chatRoomId': chatRoomId, // Include chatRoomId in the thread map
           'isUnread': isUnread,
         };
       }).toList();
@@ -223,9 +253,10 @@ class _ChatListPageState extends State<ChatListPage> {
           _chatThreads = threads;
           _isLoading = false;
         });
+        debugPrint('ChatListPage: Updated _chatThreads. Total threads: ${_chatThreads.length}');
       }
     } catch (e) {
-      debugPrint('Error processing combined snapshots: $e');
+      debugPrint('ChatListPage: Error processing combined snapshots: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Error processing chat updates: $e';
@@ -276,13 +307,15 @@ class _ChatListPageState extends State<ChatListPage> {
             ),
             child: InkWell(
               onTap: () {
-                // Navigate to actual chat screen, passing partner details
+                debugPrint('ChatListPage: Tapped thread for partner: ${thread['partnerName']}, passing chatRoomId: ${thread['chatRoomId']}');
+                // Navigate to actual chat screen, passing partner details AND chatRoomId
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => ChatScreen(
                       partnerId: thread['partnerId']!,
                       partnerName: thread['partnerName']!,
+                      chatRoomId: thread['chatRoomId']!, // Pass the chatRoomId
                     ),
                   ),
                 );
@@ -376,6 +409,8 @@ class _ChatListPageState extends State<ChatListPage> {
             return;
           }
 
+          debugPrint('ChatListPage: Floating action button pressed. Current User UID: ${_currentUser!.uid}, Role: ${_currentUserRole!}');
+
           final selectedPartner = await Navigator.push(
             currentContext, // Use captured context
             MaterialPageRoute(
@@ -389,16 +424,23 @@ class _ChatListPageState extends State<ChatListPage> {
           // If a partner was selected, navigate to the ChatScreen
           if (selectedPartner != null && selectedPartner is Map<String, dynamic>) {
             if (currentContext.mounted) { // Use captured context and check mounted
+              // Generate chatRoomId for the new chat
+              final newChatRoomId = _generateChatRoomId(_currentUser!.uid, selectedPartner['id']!);
+              debugPrint('ChatListPage: Selected partner: ${selectedPartner['name']} (ID: ${selectedPartner['id']}), Generated newChatRoomId: $newChatRoomId');
+
               Navigator.push(
                 currentContext, // Use captured context
                 MaterialPageRoute(
                   builder: (context) => ChatScreen(
                     partnerId: selectedPartner['id']!,
                     partnerName: selectedPartner['name']!,
+                    chatRoomId: newChatRoomId, // Pass the newly generated chatRoomId
                   ),
                 ),
               );
             }
+          } else {
+            debugPrint('ChatListPage: No partner selected or selection cancelled.');
           }
           debugPrint('Start New Chat pressed by ${_currentUserName ?? "Unknown User"}');
         },

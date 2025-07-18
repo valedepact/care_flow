@@ -1,175 +1,147 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth to get current nurse's UID
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:care_flow/screens/patient_profile_page.dart'; // Import PatientProfilePage
-// Removed: import 'package:flutter/foundation.dart'; // debugPrint is available via material.dart
 
 class NursePatientListScreen extends StatefulWidget {
-  const NursePatientListScreen({super.key});
+  final String nurseId; // IMPORTANT: This parameter is required for filtering
+
+  const NursePatientListScreen({super.key, required this.nurseId}); // Constructor now requires nurseId
 
   @override
   State<NursePatientListScreen> createState() => _NursePatientListScreenState();
 }
 
 class _NursePatientListScreenState extends State<NursePatientListScreen> {
-  List<Patient> _patients = [];
-  bool _isLoading = true;
-  String _errorMessage = '';
-  String? _currentNurseId; // To store the logged-in nurse's UID
+  // No need for _patients list, _isLoading, or _errorMessage here,
+  // as StreamBuilder handles loading and data directly.
 
   @override
   void initState() {
     super.initState();
-    _getCurrentNurseIdAndFetchPatients(); // Combined method
-  }
-
-  // Get the current nurse's UID and then fetch their patients
-  Future<void> _getCurrentNurseIdAndFetchPatients() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _currentNurseId = user.uid;
-      debugPrint('Current Nurse ID for patient list: $_currentNurseId');
-      _fetchPatients(); // Fetch patients once nurse ID is available
-    } else {
-      debugPrint('No nurse user logged in. Cannot fetch patients.');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Please log in as a nurse to view your patients.';
-        });
-      }
-    }
-  }
-
-  Future<void> _fetchPatients() async {
-    if (_currentNurseId == null) {
-      debugPrint('Nurse ID is null, cannot fetch patients.');
-      return; // Should not happen if _getCurrentNurseIdAndFetchPatients is called correctly
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-    try {
-      // *** IMPORTANT CHANGE HERE: Filter patients by nurseId ***
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('patients')
-          .where('nurseId', isEqualTo: _currentNurseId) // Filter by current nurse's ID
-          .snapshots() // Use snapshots for real-time updates
-          .first; // Get the first snapshot to convert to Future
-
-      if (!mounted) return; // Check mounted after await
-
-      List<Patient> fetchedPatients = snapshot.docs.map((doc) {
-        return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          _patients = fetchedPatients;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching patients: $e'); // Use debugPrint
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Error loading patients: $e';
-          _isLoading = false;
-        });
-      }
-    }
+    // The nurseId is now passed via the widget, so no need to fetch it here.
+    // StreamBuilder will handle fetching patients based on widget.nurseId.
   }
 
   @override
   Widget build(BuildContext context) {
+    // The current nurse's ID is available via widget.nurseId
+    // We can add a check here, though it should always be provided by CaregiverDashboard
+    if (widget.nurseId.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('My Claimed Patients'),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          elevation: 4,
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Error: Nurse ID not provided. Please log in again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Patients'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: const Text('My Claimed Patients'), // More specific title
+        backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-          ? Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _errorMessage,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red, fontSize: 16),
-          ),
-        ),
-      )
-          : _patients.isEmpty
-          ? const Center(
-        child: Text('You have not claimed any patients yet. Go to "Patient Management" to claim patients.'),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: _patients.length,
-        itemBuilder: (context, index) {
-          final patient = _patients[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: InkWell(
-              onTap: () {
-                // Navigate to PatientProfilePage, passing the patient ID
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PatientProfilePage(
-                      patientId: patient.id,
-                      patientName: patient.name, // Pass name for initial display
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('patients')
+            .where('nurseId', isEqualTo: widget.nurseId) // Filter by the nurseId passed to the widget
+            .orderBy('name', descending: false) // Order by patient name
+            .snapshots(), // Use .snapshots() for real-time updates
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            debugPrint('Error fetching patients stream: ${snapshot.error}');
+            return Center(child: Text('Error loading patients: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('You have not claimed any patients yet.'),
+            );
+          }
+
+          final patients = snapshot.data!.docs.map((doc) {
+            return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+          }).toList();
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: patients.length,
+            itemBuilder: (context, index) {
+              final patient = patients[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    // Navigate to PatientProfilePage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientProfilePage(
+                          patientId: patient.id,
+                          patientName: patient.name,
+                        ),
+                      ),
+                    );
+                    debugPrint('Opening patient profile for ${patient.name} (ID: ${patient.id})');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          patient.name,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueAccent.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Condition: ${patient.condition.isNotEmpty ? patient.condition : 'N/A'}',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        Text(
+                          'Age: ${patient.age}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          'Gender: ${patient.gender}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          'Contact: ${patient.contact}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        // You can add more patient details here
+                      ],
                     ),
                   ),
-                ).then((_) {
-                  // Refresh the patient list when returning from the profile/edit screen
-                  _fetchPatients(); // Re-fetch patients to ensure updated list
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      patient.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ID: ${patient.id}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    Text(
-                      'Condition: ${patient.condition.isNotEmpty ? patient.condition : 'N/A'}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    Text(
-                      'Contact: ${patient.contact}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Icon(Icons.arrow_forward_ios, color: Colors.grey[400]),
-                    ),
-                  ],
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),

@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
-import 'package:intl/intl.dart'; // For date formatting
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
-
-import 'package:care_flow/screens/visit_schedule_page.dart';
-import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
-import 'package:care_flow/screens/add_appointment_screen.dart'; // Import the AddAppointmentScreen
-import 'package:care_flow/screens/add_patient_screen.dart'; // Import the AddPatientScreen
-import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
-import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
-import 'package:care_flow/screens/nurse_patient_list_screen.dart'; // Import NursePatientListScreen
-import 'package:care_flow/screens/nurse_appointments_screen.dart'; // Import NurseAppointmentsScreen
-import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseReportsScreen
-import 'package:care_flow/screens/nurse_navigation_screen.dart'; // Import NurseNavigationScreen
+import 'package:care_flow/screens/add_patient_screen.dart'; // For adding/claiming patients
+import 'package:care_flow/screens/nurse_patient_list_screen.dart'; // For viewing claimed patients
+import 'package:care_flow/screens/visit_schedule_page.dart'; // For nurse's visit schedule
+import 'package:care_flow/screens/nurse_appointments_screen.dart'; // For nurse's appointments
+import 'package:care_flow/screens/nurse_navigation_screen.dart'; // For navigation (map)
+import 'package:care_flow/screens/messaging_page.dart'; // For messaging (ChatListPage)
+import 'package:care_flow/screens/role_router_screen.dart'; // For logout navigation
 import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Import the new NurseAlertsManagementScreen
-import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
-import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
-import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Corrected: Import PatientPrescriptionsScreen
+import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseReportsScreen
+// Import the AddAppointmentScreen
+import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
+import 'package:care_flow/screens/appointment_details_page.dart'; // Import AppointmentDetailsPage
+import 'package:intl/intl.dart'; // For date formatting
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -29,114 +25,86 @@ class CaregiverDashboard extends StatefulWidget {
 }
 
 class _CaregiverDashboardState extends State<CaregiverDashboard> {
-  int _selectedIndex = 0;
   String _nurseName = 'Loading...';
-  bool _isLoading = true;
-  List<Patient> _patients = []; // List to store fetched patients
-  List<Appointment> _upcomingVisits = []; // Changed to List<Appointment>
+  String? _currentNurseId;
+  bool _isLoadingDashboard = true; // Combined loading state for the whole dashboard
+  List<Patient> _patients = []; // List of patients assigned to this nurse
+  List<Appointment> _upcomingVisits = []; // List of upcoming visits for this nurse
+  int _selectedIndex = 0; // For BottomNavigationBar
 
   @override
   void initState() {
     super.initState();
-    _fetchNurseData();
-    _fetchPatients();
-    // _fetchUpcomingVisits() will be called after _fetchNurseData completes
+    _fetchDashboardData(); // Renamed to fetch all dashboard data
   }
 
-  Future<void> _fetchNurseData() async {
-    final currentContext = context; // Capture context
+  Future<void> _fetchDashboardData() async {
+    final currentContext = context;
+    setState(() {
+      _isLoadingDashboard = true; // Start loading for the entire dashboard
+    });
+
     User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      try {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-
-        if (!currentContext.mounted) return; // Check mounted after await
-
-        if (userDoc.exists) {
-          setState(() {
-            _nurseName = userDoc.get('fullName') ?? 'Caregiver';
-            _isLoading = false;
-          });
-          await _fetchUpcomingVisits(currentUser.uid); // Fetch visits after nurse data is loaded
-        } else {
-          debugPrint('Nurse document not found for UID: ${currentUser.uid}');
-          setState(() {
-            _nurseName = 'Caregiver (Profile Incomplete)';
-            _isLoading = false;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error fetching nurse data: $e');
-        if (currentContext.mounted) {
-          ScaffoldMessenger.of(currentContext).showSnackBar(
-            SnackBar(content: Text('Error loading nurse data: $e')),
-          );
-          setState(() {
-            _nurseName = 'Error Loading';
-            _isLoading = false;
-          });
-        }
-      }
-    } else {
+    if (currentUser == null) {
       if (currentContext.mounted) {
-        Navigator.pushAndRemoveUntil(
+        Navigator.pushReplacement(
           currentContext,
           MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
-              (route) => false,
         );
       }
+      return;
     }
-  }
 
-  Future<void> _fetchPatients() async {
+    _currentNurseId = currentUser.uid;
+
     try {
-      QuerySnapshot patientSnapshot = await FirebaseFirestore.instance.collection('patients').get();
+      // 1. Fetch Nurse Data
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentNurseId)
+          .get();
 
-      if (!mounted) return; // Check mounted after await
+      if (!currentContext.mounted) return;
 
-      List<Patient> fetchedPatients = patientSnapshot.docs.map((doc) {
+      if (userDoc.exists) {
+        _nurseName = userDoc.get('fullName') ?? 'Nurse';
+      } else {
+        debugPrint('Nurse document not found for UID: $_currentNurseId');
+        _nurseName = 'Nurse (Profile Incomplete)';
+      }
+
+      // 2. Fetch Patients assigned to this Nurse
+      QuerySnapshot patientSnapshot = await FirebaseFirestore.instance
+          .collection('patients')
+          .where('nurseId', isEqualTo: _currentNurseId)
+          .orderBy('name', descending: false)
+          .limit(5) // Limit to a few recent patients for the dashboard card
+          .get();
+
+      if (!currentContext.mounted) return;
+
+      _patients = patientSnapshot.docs.map((doc) {
         return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
 
-      if (mounted) {
-        setState(() {
-          _patients = fetchedPatients;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching patients: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading patients: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _fetchUpcomingVisits(String nurseId) async {
-    try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
+      // 3. Fetch Upcoming Visits for this Nurse
+      QuerySnapshot visitSnapshot = await FirebaseFirestore.instance
           .collection('appointments')
-          .where('assignedToId', isEqualTo: nurseId) // Filter by current nurse's ID
-          .where('dateTime', isGreaterThanOrEqualTo: DateTime.now()) // Only upcoming visits
+          .where('assignedToId', isEqualTo: _currentNurseId)
+          .where('dateTime', isGreaterThanOrEqualTo: Timestamp.now()) // Only upcoming visits
           .orderBy('dateTime', descending: false) // Order by date ascending
           .limit(5) // Limit to a few upcoming visits for the dashboard card
           .get();
 
-      if (!mounted) return; // Check mounted after await
+      if (!currentContext.mounted) return;
 
-      List<Appointment> fetchedVisits = snapshot.docs.map((doc) {
+      _upcomingVisits = visitSnapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         DateTime visitDateTime = (data['dateTime'] as Timestamp).toDate();
-
         AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
               (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
           orElse: () => AppointmentStatus.upcoming,
         );
-
         return Appointment(
           id: doc.id,
           patientId: data['patientId'] ?? '',
@@ -153,29 +121,34 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         );
       }).toList();
 
-      if (mounted) {
-        setState(() {
-          _upcomingVisits = fetchedVisits;
-        });
-      }
     } catch (e) {
-      debugPrint('Error fetching upcoming visits: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading upcoming visits: $e')),
+      debugPrint('Error fetching dashboard data: $e');
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          SnackBar(content: Text('Error loading dashboard data: $e')),
         );
+      }
+      // Optionally clear data or show specific error messages
+      _nurseName = 'Error Loading';
+      _patients = [];
+      _upcomingVisits = [];
+    } finally {
+      if (currentContext.mounted) {
+        setState(() {
+          _isLoadingDashboard = false; // End loading for the entire dashboard
+        });
       }
     }
   }
 
   Future<void> _logout() async {
-    final currentContext = context; // Capture context
+    final currentContext = context;
     setState(() {
-      _isLoading = true;
+      _isLoadingDashboard = true; // Show loading while logging out
     });
     try {
       await FirebaseAuth.instance.signOut();
-      if (!currentContext.mounted) return; // Check mounted after await
+      if (!currentContext.mounted) return;
       Navigator.pushAndRemoveUntil(
         currentContext,
         MaterialPageRoute(builder: (context) => const RoleRouterScreen()),
@@ -188,10 +161,242 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           SnackBar(content: Text('Error logging out: $e')),
         );
         setState(() {
-          _isLoading = false;
+          _isLoadingDashboard = false;
         });
       }
     }
+  }
+
+  // Helper method for dashboard buttons
+  Widget _buildDashboardButton(BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? color,
+  }) {
+    return SizedBox(
+      width: 150,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? Theme.of(context).colorScheme.surfaceContainerHighest,
+          foregroundColor: color != null ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 36),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget to display a card with recent patients
+  Widget _patientListCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'My Patients',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+            ),
+            const SizedBox(height: 15),
+            _patients.isEmpty
+                ? const Center(
+              child: Text('You have not claimed any patients yet.'),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _patients.length, // Display all fetched patients (up to limit)
+              itemBuilder: (context, index) {
+                final Patient patient = _patients[index];
+                return InkWell(
+                  onTap: () {
+                    if (patient.id.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PatientProfilePage(
+                            patientId: patient.id,
+                            patientName: patient.name,
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Patient ID not available. Cannot view profile.')),
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            patient.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          patient.condition.isNotEmpty ? patient.condition : 'Stable',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 15),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  if (_currentNurseId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NursePatientListScreen(
+                          nurseId: _currentNurseId!,
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nurse ID not available. Cannot view full list.')),
+                    );
+                  }
+                  debugPrint('View All Patients pressed - Navigating to NursePatientListScreen');
+                },
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('View All'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Upcoming Patients Visits Card
+  Widget _upcomingPatientsVisitsCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Upcoming Visits', // Changed title to be more general
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+            ),
+            const SizedBox(height: 15),
+            _upcomingVisits.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text('No upcoming visits scheduled.'),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _upcomingVisits.length, // Display all fetched visits
+              itemBuilder: (context, index) {
+                final visit = _upcomingVisits[index];
+                return InkWell(
+                  onTap: () {
+                    // Navigate to AppointmentDetailsPage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AppointmentDetailsPage(appointment: visit),
+                      ),
+                    );
+                    debugPrint('View details for visit: ${visit.id}');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${visit.patientName} (${visit.type})', // Show patient name and type
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          DateFormat('h:mm a').format(visit.dateTime),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 15),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
+                  );
+                  debugPrint('View All Visits pressed');
+                },
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('View All'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _onItemTapped(int index) {
@@ -199,26 +404,34 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 1) {
-      Navigator.push(
-        currentContext,
-        MaterialPageRoute(builder: (currentContext) => const NursePatientListScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.push(
-        currentContext,
-        MaterialPageRoute(builder: (currentContext) => const NurseAppointmentsScreen()),
-      );
-    } else if (index == 3) {
-      Navigator.push(
-        currentContext,
-        MaterialPageRoute(builder: (currentContext) => const NurseNavigationScreen()),
-      );
-    } else if (index == 4) {
-      Navigator.push(
-        currentContext,
-        MaterialPageRoute(builder: (currentContext) => const NurseReportsScreen()),
-      );
+    // Navigate based on index
+    switch (index) {
+      case 0: // Home (Dashboard) - no navigation needed, already here
+        break;
+      case 1: // Patients
+        Navigator.push(
+          currentContext,
+          MaterialPageRoute(builder: (context) => NursePatientListScreen(nurseId: _currentNurseId!)),
+        );
+        break;
+      case 2: // Schedule (Appointments)
+        Navigator.push(
+          currentContext,
+          MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
+        );
+        break;
+      case 3: // Map (Navigation)
+        Navigator.push(
+          currentContext,
+          MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
+        );
+        break;
+      case 4: // Reports
+        Navigator.push(
+          currentContext,
+          MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
+        );
+        break;
     }
   }
 
@@ -226,7 +439,9 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CAREGIVER DASHBOARD'),
+        title: const Text('Caregiver Dashboard'),
+        backgroundColor: Colors.blueAccent,
+        elevation: 4,
         actions: [
           IconButton(
             icon: const Icon(Icons.search_rounded),
@@ -247,217 +462,157 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           ),
         ],
       ),
-      body: _isLoading
+      body: _isLoadingDashboard // Use the combined loading state
           ? const Center(
         child: CircularProgressIndicator(),
       )
-          : SafeArea(
+          : Center(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Hello, $_nurseName!',
-                  style: Theme.of(context).textTheme.headlineMedium,
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Nurse Icon
+              Icon(
+                Icons.local_hospital_outlined,
+                size: 100,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 20),
+
+              // Welcome Message
+              Text(
+                'Welcome, Nurse $_nurseName!',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                Text(
-                  'Today, ${DateFormat('MMM d').format(DateTime.now())}', // Dynamic date
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
+              ),
+              const SizedBox(height: 10),
+
+              // Subtitle/Description
+              Text(
+                'Manage your patients, appointments, and daily tasks efficiently.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey[700],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Your Day at a Glance',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _patientListCard(),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _upcomingPatientsVisitsCard(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Total Patients',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          '${_patients.length}',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Today\'s Visits',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          '${_upcomingVisits.length}', // Dynamic today's visits
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Today\'s Schedule',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
-                        );
-                        debugPrint('View All Schedule button pressed');
-                      },
-                      child: Text(
-                        'View All',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Quick Actions',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12.0,
-                  runSpacing: 12.0,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    QuickActionButton(
-                      label: 'Add Patient',
-                      icon: Icons.person_add_rounded,
-                      onPressed: () {
-                        final currentContext = context; // Capture context
-                        Navigator.push(
-                          currentContext,
-                          MaterialPageRoute(builder: (context) => const AddPatientScreen()),
-                        ).then((_) {
-                          if (currentContext.mounted) { // Check mounted
-                            _fetchPatients();
-                          }
-                        });
-                        debugPrint('Add Patient button pressed');
-                      },
-                      color: Colors.purple,
-                    ),
-                    QuickActionButton(
-                      label: 'New Appointment',
-                      icon: Icons.calendar_month,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AddAppointmentScreen()),
-                        );
-                        debugPrint('New appointment button pressed');
-                      },
-                      color: Colors.orange,
-                    ),
-                    QuickActionButton(
-                      label: 'Generate Report',
-                      icon: Icons.description,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
-                        );
-                        debugPrint('Generate Report button pressed - Navigating to reports screen');
-                      },
-                      color: Colors.teal,
-                    ),
-                    QuickActionButton(
-                      label: 'Start Navigation',
-                      icon: Icons.navigation,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
-                        );
-                        debugPrint('Navigation button pressed - Navigating to navigation screen');
-                      },
-                      color: Colors.redAccent,
-                    ),
-                    QuickActionButton(
-                      label: 'Schedule Reminder',
-                      icon: Icons.add_alarm,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AlertsPage()),
-                        );
-                        debugPrint('Schedule Reminder button pressed');
-                      },
-                      color: Colors.blueGrey,
-                    ),
-                    QuickActionButton(
-                      label: 'Messages',
-                      icon: Icons.message,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ChatListPage()),
-                        );
-                        debugPrint('Messages button pressed from Nurse Dashboard');
-                      },
-                      color: Colors.indigo,
-                    ),
-                    QuickActionButton(
-                      label: 'My Appointments',
-                      icon: Icons.calendar_today,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
-                        );
-                        debugPrint('My Appointments button pressed from Nurse Dashboard');
-                      },
-                      color: Colors.green,
-                    ),
-                    QuickActionButton(
-                      label: 'Manage Alerts',
-                      icon: Icons.list_alt,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
-                        );
-                        debugPrint('Manage Alerts pressed from Nurse Dashboard');
-                      },
-                      color: Colors.deepPurple,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 40),
+
+              // Quick Actions/Navigation Buttons
+              Wrap(
+                spacing: 16.0,
+                runSpacing: 16.0,
+                alignment: WrapAlignment.center,
+                children: [
+                  QuickActionButton(
+                    label: 'Patient Management',
+                    icon: Icons.group,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddPatientScreen()),
+                      );
+                      debugPrint('Patient Management pressed - Navigating to AddPatientScreen');
+                    },
+                    color: Colors.purple, // Added color
+                  ),
+                  QuickActionButton(
+                    label: 'My Appointments',
+                    icon: Icons.calendar_today,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
+                      );
+                      debugPrint('My Appointments pressed - Navigating to NurseAppointmentsScreen');
+                    },
+                    color: Colors.green, // Added color
+                  ),
+                  QuickActionButton(
+                    label: 'Visit Schedule',
+                    icon: Icons.schedule,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
+                      );
+                      debugPrint('Visit Schedule pressed - Navigating to VisitSchedulePage');
+                    },
+                    color: Colors.orange, // Added color
+                  ),
+                  QuickActionButton(
+                    label: 'Messages',
+                    icon: Icons.message,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ChatListPage()),
+                      );
+                      debugPrint('Messages pressed - Navigating to ChatListPage');
+                    },
+                    color: Colors.indigo, // Added color
+                  ),
+                  QuickActionButton(
+                    label: 'Navigation',
+                    icon: Icons.navigation,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
+                      );
+                      debugPrint('Navigation pressed - Navigating to NurseNavigationScreen');
+                    },
+                    color: Colors.redAccent.shade700,
+                  ),
+                  QuickActionButton(
+                    label: 'Emergency Alerts',
+                    icon: Icons.notifications_active,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Emergency Alerts functionality coming soon!')),
+                      );
+                      debugPrint('Emergency Alerts pressed');
+                    },
+                    color: Colors.orange.shade700,
+                  ),
+                  QuickActionButton(
+                    label: 'Generate Report',
+                    icon: Icons.description,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
+                      );
+                      debugPrint('Generate Report button pressed - Navigating to reports screen');
+                    },
+                    color: Colors.teal,
+                  ),
+                  QuickActionButton(
+                    label: 'Manage Alerts',
+                    icon: Icons.list_alt,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
+                      );
+                      debugPrint('Manage Alerts pressed from Nurse Dashboard');
+                    },
+                    color: Colors.deepPurple,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+
+              // Recent Patients Card (now filtered)
+              _patientListCard(),
+              const SizedBox(height: 16), // Spacing between cards
+
+              // Upcoming Patients Visits Card
+              _upcomingPatientsVisitsCard(),
+            ],
           ),
         ),
       ),
@@ -490,151 +645,6 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
             label: 'Reports',
           ),
         ],
-      ),
-    );
-  }
-
-  // Patient List Card
-  Widget _patientListCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'PATIENT LIST',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const Divider(thickness: 1.5),
-            _patients.isEmpty
-                ? const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text('No patients assigned yet.'),
-            )
-                : ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _patients.length > 4 ? 4 : _patients.length,
-              itemBuilder: (context, index) {
-                final Patient patient = _patients[index];
-                return InkWell(
-                  onTap: () {
-                    final currentContext = context; // Capture context
-                    Navigator.push(
-                      currentContext,
-                      MaterialPageRoute(
-                        builder: (context) => PatientProfilePage(
-                          patientId: patient.id,
-                          patientName: patient.name,
-                        ),
-                      ),
-                    ).then((_) {
-                      if (currentContext.mounted) { // Check mounted
-                        _fetchPatients();
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      children: [
-                        Text(patient.name),
-                        const Spacer(),
-                        Text(patient.condition.isNotEmpty ? patient.condition : 'Stable'),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            if (_patients.length > 4)
-              Align(
-                alignment: Alignment.bottomRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NursePatientListScreen()),
-                    ).then((_) {
-                      // No need for mounted check here as _fetchPatients itself has it.
-                      _fetchPatients();
-                    });
-                    debugPrint('View All Patients pressed');
-                  },
-                  child: Text(
-                    'View All Patients',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Upcoming Patients Visits Card
-  Widget _upcomingPatientsVisitsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'UPCOMING PATIENT VISITS',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const Divider(thickness: 1.5),
-            _upcomingVisits.isEmpty
-                ? const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text('No upcoming visits today.'),
-            )
-                : ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _upcomingVisits.length, // Display all fetched visits
-              itemBuilder: (context, index) {
-                final visit = _upcomingVisits[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Text(visit.patientName),
-                      const SizedBox(width: 10),
-                      Text(visit.location),
-                      const Spacer(),
-                      Text(DateFormat('h:mm a').format(visit.dateTime)),
-                    ],
-                  ),
-                );
-              },
-            ),
-            if (_upcomingVisits.isNotEmpty) // Show "View All" if there are any visits
-              Align(
-                alignment: Alignment.bottomRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
-                    );
-                    debugPrint('View All Visits pressed');
-                  },
-                  child: Text(
-                    'View All Visits',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

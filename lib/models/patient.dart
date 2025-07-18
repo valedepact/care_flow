@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Patient {
   final String id;
   final String name;
-  final String age;
+  final int age; // Changed to int
+  final DateTime? dob; // Added Date of Birth as DateTime
   final String gender;
   final String contact;
   final String address;
@@ -23,6 +24,7 @@ class Patient {
     required this.id,
     required this.name,
     required this.age,
+    this.dob, // dob is now optional in constructor
     required this.gender,
     required this.contact,
     required this.address,
@@ -40,10 +42,31 @@ class Patient {
   });
 
   factory Patient.fromFirestore(Map<String, dynamic> data, String id) {
+    DateTime? parsedDob;
+    if (data['dob'] is Timestamp) {
+      parsedDob = (data['dob'] as Timestamp).toDate();
+    }
+
+    // Calculate age from DOB, or use a default if DOB is missing
+    int calculatedAge = 0;
+    if (parsedDob != null) {
+      DateTime today = DateTime.now();
+      calculatedAge = today.year - parsedDob.year;
+      if (today.month < parsedDob.month ||
+          (today.month == parsedDob.month && today.day < parsedDob.day)) {
+        calculatedAge--;
+      }
+    } else {
+      // Fallback if dob is not available or invalid
+      calculatedAge = int.tryParse(data['age']?.toString() ?? '0') ?? 0;
+    }
+
+
     return Patient(
       id: id,
       name: data['name'] ?? 'Unknown Patient',
-      age: data['age'] ?? 'N/A',
+      age: calculatedAge, // Use calculated age
+      dob: parsedDob, // Store parsed DOB
       gender: data['gender'] ?? 'N/A',
       contact: data['contact'] ?? 'N/A',
       address: data['address'] ?? 'N/A',
@@ -64,7 +87,8 @@ class Patient {
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
-      'age': age,
+      'age': age, // Store calculated age
+      'dob': dob != null ? Timestamp.fromDate(dob!) : null, // Store DOB as Timestamp
       'gender': gender,
       'contact': contact,
       'address': address,
