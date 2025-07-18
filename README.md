@@ -31,10 +31,13 @@ Here are some Screenshots
 
 HOME SCREEN
 - https://github.com/valedepact/care_flow/blob/main/home.jpg?raw=true
+
 PATIENT MONITORING SCREEN
 https://github.com/valedepact/care_flow/blob/main/patient%20management.jpg?raw=true
+ 
   MESSAGING SCREEN
   https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
+  
   DASHBOARD
   https://github.com/valedepact/care_flow/blob/main/dashboard.jpg?raw=true
 
