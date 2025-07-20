@@ -3,107 +3,128 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Patient {
   final String id;
   final String name;
-  final int age; // Changed to int
-  final DateTime? dob; // Added Date of Birth as DateTime
+  final String email;
+  final String age; // Keeping as String for flexibility (e.g., "25 years", "Infant")
   final String gender;
   final String contact;
   final String address;
   final String condition;
-  final List<dynamic> medications; // Use dynamic for lists from Firestore
-  final List<dynamic> treatmentHistory; // Use dynamic for lists from Firestore
-  final String lastVisit;
-  final String? email; // Nullable
+  final List<String> medications;
+  final List<String> treatmentHistory;
+  final List<String> notes; // Keeping as List<String> for simplicity, consider a subcollection for full notes
+  final List<String> imageUrls;
+  final String lastVisit; // Keeping as String for simplicity, consider DateTime
   final String? emergencyContactName; // Nullable
   final String? emergencyContactNumber; // Nullable
-  final String? nurseId; // ID of the assigned nurse
+  final DateTime createdAt;
+  final String? nurseId; // Nullable, stores UID of assigned nurse
   final String status; // e.g., 'unassigned', 'assigned'
-  final List<dynamic> notes; // For patient-specific notes
-  final List<dynamic> imageUrls; // For storing image URLs
+  final double? latitude; // New: Patient's location latitude
+  final double? longitude; // New: Patient's location longitude
+  final String? locationName; // New: A descriptive name for the patient's location
+  final DateTime? dob; // NEW: Date of Birth as DateTime
+  final int? calculatedAge; // NEW: Calculated age as int
 
   Patient({
     required this.id,
     required this.name,
-    required this.age,
-    this.dob, // dob is now optional in constructor
+    required this.email,
+    required this.age, // This will be the display string
     required this.gender,
     required this.contact,
     required this.address,
     required this.condition,
     required this.medications,
     required this.treatmentHistory,
+    required this.notes,
+    required this.imageUrls,
     required this.lastVisit,
-    this.email,
     this.emergencyContactName,
     this.emergencyContactNumber,
+    required this.createdAt,
     this.nurseId,
-    this.status = 'unassigned', // Default status
-    this.notes = const [],
-    this.imageUrls = const [],
+    required this.status,
+    this.latitude,
+    this.longitude,
+    this.locationName,
+    this.dob, // Include in constructor
+    this.calculatedAge, // Include in constructor
   });
 
+  // Factory constructor to create a Patient from a Firestore DocumentSnapshot
   factory Patient.fromFirestore(Map<String, dynamic> data, String id) {
     DateTime? parsedDob;
     if (data['dob'] is Timestamp) {
       parsedDob = (data['dob'] as Timestamp).toDate();
     }
 
-    // Calculate age from DOB, or use a default if DOB is missing
-    int calculatedAge = 0;
-    if (parsedDob != null) {
-      DateTime today = DateTime.now();
-      calculatedAge = today.year - parsedDob.year;
-      if (today.month < parsedDob.month ||
-          (today.month == parsedDob.month && today.day < parsedDob.day)) {
-        calculatedAge--;
-      }
-    } else {
-      // Fallback if dob is not available or invalid
-      calculatedAge = int.tryParse(data['age']?.toString() ?? '0') ?? 0;
+    int? calculatedAge;
+    if (data['calculatedAge'] is num) { // Handle both int and double from Firestore
+      calculatedAge = (data['calculatedAge'] as num).toInt();
     }
 
+    // Determine the 'age' string for display
+    String displayAge;
+    if (calculatedAge != null) {
+      displayAge = calculatedAge.toString();
+    } else if (data['age'] is num) { // Fallback to old 'age' if it was a number
+      displayAge = (data['age'] as num).toString();
+    } else {
+      displayAge = data['age'] ?? 'N/A'; // Use existing 'age' string or 'N/A'
+    }
 
     return Patient(
       id: id,
-      name: data['name'] ?? 'Unknown Patient',
-      age: calculatedAge, // Use calculated age
-      dob: parsedDob, // Store parsed DOB
+      name: data['name'] ?? '',
+      email: data['email'] ?? '',
+      age: displayAge, // Use the derived displayAge
       gender: data['gender'] ?? 'N/A',
       contact: data['contact'] ?? 'N/A',
       address: data['address'] ?? 'N/A',
       condition: data['condition'] ?? 'N/A',
-      medications: List<dynamic>.from(data['medications'] ?? []),
-      treatmentHistory: List<dynamic>.from(data['treatmentHistory'] ?? []),
+      medications: List<String>.from(data['medications'] ?? []),
+      treatmentHistory: List<String>.from(data['treatmentHistory'] ?? []),
+      notes: List<String>.from(data['notes'] ?? []),
+      imageUrls: List<String>.from(data['imageUrls'] ?? []),
       lastVisit: data['lastVisit'] ?? 'N/A',
-      email: data['email'],
       emergencyContactName: data['emergencyContactName'],
       emergencyContactNumber: data['emergencyContactNumber'],
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
       nurseId: data['nurseId'],
       status: data['status'] ?? 'unassigned',
-      notes: List<dynamic>.from(data['notes'] ?? []),
-      imageUrls: List<dynamic>.from(data['imageUrls'] ?? []),
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
+      locationName: data['locationName'],
+      dob: parsedDob, // Parse DOB
+      calculatedAge: calculatedAge, // Parse calculatedAge
     );
   }
 
+  // Method to convert Patient object to a map for Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
-      'age': age, // Store calculated age
-      'dob': dob != null ? Timestamp.fromDate(dob!) : null, // Store DOB as Timestamp
+      'email': email,
+      'age': age, // Still store the display string age (for backward compatibility/simplicity)
       'gender': gender,
       'contact': contact,
       'address': address,
       'condition': condition,
       'medications': medications,
       'treatmentHistory': treatmentHistory,
-      'lastVisit': lastVisit,
-      'email': email,
-      'emergencyContactName': emergencyContactName,
-      'emergencyContactNumber': emergencyContactNumber,
-      'nurseId': nurseId,
-      'status': status,
       'notes': notes,
       'imageUrls': imageUrls,
-      'createdAt': FieldValue.serverTimestamp(), // Add creation timestamp if not already present
+      'lastVisit': lastVisit,
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactNumber': emergencyContactNumber,
+      'createdAt': FieldValue.serverTimestamp(),
+      'nurseId': nurseId,
+      'status': status,
+      'latitude': latitude,
+      'longitude': longitude,
+      'locationName': locationName,
+      'dob': dob != null ? Timestamp.fromDate(dob!) : null, // Store DOB as Timestamp
+      'calculatedAge': calculatedAge, // Store calculated age as int
     };
   }
 }

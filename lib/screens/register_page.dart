@@ -82,6 +82,8 @@ class _RegisterCardState extends State<RegisterCard> {
             'emergencyContactName': null,
             'emergencyContactNumber': null,
             'createdAt': FieldValue.serverTimestamp(),
+            'nurseId': null, // Explicitly set nurseId to null for unassigned patients
+            'status': 'unassigned', // New field to track patient assignment status
           });
         }
 
@@ -93,7 +95,7 @@ class _RegisterCardState extends State<RegisterCard> {
               backgroundColor: Colors.green,
             ),
           );
-          // *** CHANGE HERE: Navigate to LoginPage instead of RoleRouterScreen ***
+          // Navigate to LoginPage instead of RoleRouterScreen
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const LoginPage()),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
+// For debugPrint
 import 'package:intl/intl.dart'; // For date formatting
 
 class EditPatientScreen extends StatefulWidget {
@@ -26,6 +27,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
   late TextEditingController _lastVisitController;
   late TextEditingController _emergencyContactNameController;
   late TextEditingController _emergencyContactNumberController;
+  late TextEditingController _locationNameController; // NEW: For location name
+  late TextEditingController _latitudeController; // NEW: For latitude
+  late TextEditingController _longitudeController; // NEW: For longitude
 
   String? _selectedGender;
   bool _isLoading = false; // To show a loading indicator
@@ -50,6 +54,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
     _lastVisitController = TextEditingController(text: widget.patient.lastVisit);
     _emergencyContactNameController = TextEditingController(text: widget.patient.emergencyContactName ?? '');
     _emergencyContactNumberController = TextEditingController(text: widget.patient.emergencyContactNumber ?? '');
+    _locationNameController = TextEditingController(text: widget.patient.locationName ?? ''); // Initialize location name
+    _latitudeController = TextEditingController(text: widget.patient.latitude?.toString() ?? ''); // Initialize latitude
+    _longitudeController = TextEditingController(text: widget.patient.longitude?.toString() ?? ''); // Initialize longitude
 
     _selectedGender = widget.patient.gender;
   }
@@ -68,6 +75,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
     _lastVisitController.dispose();
     _emergencyContactNameController.dispose();
     _emergencyContactNumberController.dispose();
+    _locationNameController.dispose(); // Dispose location name controller
+    _latitudeController.dispose(); // Dispose latitude controller
+    _longitudeController.dispose(); // Dispose longitude controller
     super.dispose();
   }
 
@@ -88,6 +98,15 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
     }
   }
 
+  int _calculateAge(DateTime dob) {
+    DateTime today = DateTime.now();
+    int age = today.year - dob.year;
+    if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Future<void> _updatePatient() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -96,21 +115,20 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
 
       try {
         DateTime? dob;
-        int? age;
+        int? calculatedAge; // Renamed 'age' to 'calculatedAge' for clarity with Patient model
         if (_dateOfBirthController.text.isNotEmpty) {
           dob = DateTime.parse(_dateOfBirthController.text);
-          DateTime today = DateTime.now();
-          age = today.year - dob.year;
-          if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
-            age--;
-          }
+          calculatedAge = _calculateAge(dob);
         }
+
+        double? latitude = double.tryParse(_latitudeController.text.trim()); // Parse latitude
+        double? longitude = double.tryParse(_longitudeController.text.trim()); // Parse longitude
 
         // Create a map of updated patient data
         Map<String, dynamic> updatedData = {
           'name': _fullNameController.text.trim(),
           'dob': dob != null ? Timestamp.fromDate(dob) : null, // Store DOB as Timestamp
-          'age': age, // Store calculated age
+          'calculatedAge': calculatedAge, // Store calculated age
           'gender': _selectedGender ?? 'N/A',
           'contact': _contactNumberController.text.trim(),
           'email': _emailController.text.trim(),
@@ -124,6 +142,9 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
           // Ensure null is saved if fields are empty, or empty string if preferred
           'emergencyContactName': _emergencyContactNameController.text.trim().isEmpty ? null : _emergencyContactNameController.text.trim(),
           'emergencyContactNumber': _emergencyContactNumberController.text.trim().isEmpty ? null : _emergencyContactNumberController.text.trim(),
+          'latitude': latitude, // Include latitude in updated data
+          'longitude': longitude, // Include longitude in updated data
+          'locationName': _locationNameController.text.trim().isEmpty ? null : _locationNameController.text.trim(), // Include location name
           'updatedAt': FieldValue.serverTimestamp(), // Add an update timestamp
         };
 
@@ -385,6 +406,61 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
                 ),
                 textInputAction: TextInputAction.next,
                 onEditingComplete: () => FocusScope.of(context).nextFocus(),
+              ),
+              const SizedBox(height: 24),
+
+              // NEW: Location Details Section
+              Text(
+                'Location Details',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _locationNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Location Name (e.g., Home, Clinic)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.place),
+                ),
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _latitudeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latitude',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.gps_fixed),
+                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _longitudeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Longitude',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.gps_not_fixed),
+                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
