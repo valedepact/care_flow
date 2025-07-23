@@ -3,10 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
+import 'package:care_flow/models/patient.dart'; // Import Patient model
 
 class AddAppointmentScreen extends StatefulWidget {
-  final String patientId;
-  final String patientName;
+  final String patientId; // Can be empty if nurse is adding generally
+  final String patientName; // Can be empty if nurse is adding generally
 
   const AddAppointmentScreen({
     super.key,
@@ -20,32 +21,69 @@ class AddAppointmentScreen extends StatefulWidget {
 
 class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _typeController = TextEditingController();
+  // Changed _typeController to _selectedType for Dropdown
+  String? _selectedType;
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _patientNameDisplayController = TextEditingController();
 
   User? _currentUser;
   String? _currentUserName;
   bool _isLoading = false;
+  bool _isInitialTimeSet = false;
+
+  // List of predefined appointment types
+  final List<String> _appointmentTypes = [
+    'Home Visit',
+    'Clinic Appointment',
+    'Teleconsultation',
+    'Follow-up',
+    'Emergency Visit',
+    'Routine Check-up',
+    'Vaccination',
+  ];
+
+  // State for patient selection
+  String? _selectedPatientId;
+  String? _selectedPatientName;
+  List<Patient> _assignedPatients = [];
+  bool _isPatientSelectionLoading = false;
 
   @override
   void initState() {
     super.initState();
     _initializeCurrentUser();
-    // Set initial date and time to current date/time
+    // Set initial date to current date
     _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _timeController.text = TimeOfDay.now().format(context);
+
+    // If patientId is provided (from PatientProfilePage), pre-fill and set selected patient
+    if (widget.patientId.isNotEmpty) {
+      _selectedPatientId = widget.patientId;
+      _selectedPatientName = widget.patientName;
+      _patientNameDisplayController.text = widget.patientName;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize time here where context is fully available
+    if (!_isInitialTimeSet) {
+      _timeController.text = TimeOfDay.now().format(context);
+      _isInitialTimeSet = true;
+    }
   }
 
   @override
   void dispose() {
-    _typeController.dispose();
+    // _typeController.dispose(); // No longer needed for Dropdown
     _dateController.dispose();
     _timeController.dispose();
     _locationController.dispose();
     _notesController.dispose();
+    _patientNameDisplayController.dispose();
     super.dispose();
   }
 
@@ -73,6 +111,10 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
 
       if (userDoc.exists) {
         _currentUserName = userDoc.get('fullName') ?? 'Unknown Nurse';
+        // If coming from general "Add Appointment" (patientId is empty), fetch assigned patients
+        if (widget.patientId.isEmpty) {
+          await _fetchAssignedPatients();
+        }
       } else {
         _currentUserName = 'Unknown Nurse';
       }
@@ -84,6 +126,88 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
         );
       }
     }
+  }
+
+  // Fetch assigned patients for the current nurse
+  Future<void> _fetchAssignedPatients() async {
+    final currentContext = context;
+    setState(() {
+      _isPatientSelectionLoading = true;
+      _assignedPatients.clear();
+    });
+
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('patients')
+          .where('nurseId', isEqualTo: _currentUser!.uid)
+          .orderBy('name')
+          .get();
+
+      if (!currentContext.mounted) return;
+
+      setState(() {
+        _assignedPatients = snapshot.docs.map((doc) {
+          return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+        }).toList();
+        _isPatientSelectionLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching assigned patients: $e');
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          SnackBar(content: Text('Failed to load assigned patients: $e'), backgroundColor: Colors.red),
+        );
+      }
+      setState(() {
+        _isPatientSelectionLoading = false;
+      });
+    }
+  }
+
+  // Dialog to select a patient
+  void _showPatientSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Select Patient'),
+          content: _isPatientSelectionLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _assignedPatients.isEmpty
+              ? const Text('No patients assigned to you.')
+              : SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _assignedPatients.length,
+              itemBuilder: (context, index) {
+                final patient = _assignedPatients[index];
+                return ListTile(
+                  title: Text(patient.name),
+                  subtitle: Text('ID: ${patient.id}'),
+                  onTap: () {
+                    setState(() {
+                      _selectedPatientId = patient.id;
+                      _selectedPatientName = patient.name;
+                      _patientNameDisplayController.text = patient.name;
+                    });
+                    Navigator.pop(dialogContext); // Close dialog
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -127,6 +251,26 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
         return;
       }
 
+      // Validate if a patient has been selected
+      if (_selectedPatientId == null || _selectedPatientName == null || _selectedPatientId!.isEmpty) {
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            const SnackBar(content: Text('Please select a patient for the appointment.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      // Validate if an appointment type has been selected
+      if (_selectedType == null || _selectedType!.isEmpty) {
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            const SnackBar(content: Text('Please select an appointment type.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
@@ -134,7 +278,17 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
       try {
         // Combine date and time
         DateTime date = DateTime.parse(_dateController.text);
-        TimeOfDay time = TimeOfDay.fromDateTime(DateFormat('h:mm a').parse(_timeController.text));
+        TimeOfDay time;
+        try {
+          // Attempt to parse the time. If it fails, default to TimeOfDay.now()
+          DateTime? parsedTime = DateFormat('h:mm a').parse(_timeController.text);
+          time = TimeOfDay.fromDateTime(parsedTime);
+                } catch (e) {
+          debugPrint('Error parsing time string "${_timeController.text}": $e. Defaulting to current time.');
+          time = TimeOfDay.now();
+        }
+
+
         DateTime appointmentDateTime = DateTime(
           date.year,
           date.month,
@@ -145,9 +299,9 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
 
         final Appointment newAppointment = Appointment(
           id: '', // Firestore will generate this
-          patientId: widget.patientId,
-          patientName: widget.patientName,
-          type: _typeController.text.trim(),
+          patientId: _selectedPatientId!, // Use selected patient ID
+          patientName: _selectedPatientName!, // Use selected patient Name
+          type: _selectedType!, // Use the selected appointment type
           dateTime: appointmentDateTime,
           location: _locationController.text.trim(),
           status: AppointmentStatus.upcoming, // Default to upcoming
@@ -194,7 +348,7 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add Appointment for ${widget.patientName}'),
+        title: Text('Add Appointment ${widget.patientId.isNotEmpty ? "for ${widget.patientName}" : ""}'), // Dynamic title
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 4,
@@ -215,16 +369,68 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
               ),
               const SizedBox(height: 24),
 
-              TextFormField(
-                controller: _typeController,
+              // Patient Selection Field (only if patientId is not pre-filled)
+              if (widget.patientId.isEmpty) ...[
+                InkWell(
+                  onTap: _showPatientSelectionDialog,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Select Patient',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person_search),
+                      // Validator for patient selection
+                      errorText: (_selectedPatientId == null || _selectedPatientId!.isEmpty) && _formKey.currentState?.validate() == false
+                          ? 'Please select a patient'
+                          : null,
+                    ),
+                    child: Text(
+                      _patientNameDisplayController.text.isEmpty
+                          ? 'Tap to select patient'
+                          : _patientNameDisplayController.text,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              // Display patient name if pre-filled (from PatientProfilePage)
+              if (widget.patientId.isNotEmpty) ...[
+                TextFormField(
+                  controller: _patientNameDisplayController,
+                  readOnly: true, // Make it read-only as it's pre-filled
+                  decoration: const InputDecoration(
+                    labelText: 'Patient',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Appointment Type Dropdown
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                hint: const Text('Select Appointment Type'),
                 decoration: const InputDecoration(
-                  labelText: 'Appointment Type (e.g., Check-up, Consultation)',
+                  labelText: 'Appointment Type',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.category),
                 ),
+                items: _appointmentTypes.map((String type) {
+                  return DropdownMenuItem<String>(
+                    value: type,
+                    child: Text(type),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedType = newValue;
+                  });
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter appointment type';
+                    return 'Please select an appointment type';
                   }
                   return null;
                 },

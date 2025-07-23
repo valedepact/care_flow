@@ -36,12 +36,13 @@ dependencies:
   firebase_core: ^2.27.0
   cloud_firestore: ^4.15.8
   firebase_auth: ^4.17.8
+  intl: any
+  table_calendar: ^3.0.9 # NEW: Add this line for the calendar widget
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  intl: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -66,7 +67,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    # Changed from '- assets/images/' to '- images/'
     - assets/images/
     # - assets/images/my_image.png
     # - assets/icons/

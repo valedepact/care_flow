@@ -6,7 +6,7 @@ import 'package:care_flow/screens/medical_records_page.dart'; // Import MedicalR
 import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Import PatientPrescriptionsScreen
 import 'package:care_flow/screens/edit_patient_screen.dart'; // NEW: Import EditPatientScreen
 import 'package:care_flow/screens/add_appointment_screen.dart'; // NEW: Import AddAppointmentScreen
-// For debugPrint
+import 'package:intl/intl.dart'; // For DateFormat - Re-added
 
 class PatientProfilePage extends StatefulWidget {
   final String patientId;
@@ -145,8 +145,14 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     ),
                     const Divider(height: 24),
                     _buildInfoRow(context, Icons.perm_identity, 'Patient ID', _patient!.id),
-                    // FIX: Ensure age is always a string when passed to _buildInfoRow
-                    _buildInfoRow(context, Icons.cake, 'Age', _patient!.age.toString()),
+                    // Display DOB and calculated age - RESTORED LOGIC
+                    if (_patient!.dob != null)
+                      _buildInfoRow(context, Icons.calendar_today, 'Date of Birth', DateFormat('yyyy-MM-dd').format(_patient!.dob!)),
+                    if (_patient!.calculatedAge != null)
+                      _buildInfoRow(context, Icons.cake, 'Age', _patient!.calculatedAge.toString())
+                    else // This 'else' was missing in your last provided code
+                      _buildInfoRow(context, Icons.cake, 'Age', _patient!.age), // Fallback to original age string
+
                     _buildInfoRow(context, Icons.wc, 'Gender', _patient!.gender),
                     _buildInfoRow(context, Icons.phone, 'Contact', _patient!.contact),
                     _buildInfoRow(context, Icons.home, 'Address', _patient!.address),
@@ -173,7 +179,6 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                       _buildInfoRow(context, Icons.gps_fixed, 'Coordinates', '${_patient!.latitude!.toStringAsFixed(6)}, ${_patient!.longitude!.toStringAsFixed(6)}')
                     else
                       _buildInfoRow(context, Icons.location_off, 'Location', 'Not provided'),
-
                   ],
                 ),
               ),

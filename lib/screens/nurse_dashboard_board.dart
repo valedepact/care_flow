@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:care_flow/models/patient.dart'; // Import the Patient model
-import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
-import 'package:care_flow/screens/add_patient_screen.dart'; // For adding/claiming patients
-import 'package:care_flow/screens/nurse_patient_list_screen.dart'; // For viewing claimed patients
-import 'package:care_flow/screens/visit_schedule_page.dart'; // For nurse's visit schedule
-import 'package:care_flow/screens/nurse_appointments_screen.dart'; // For nurse's appointments
-import 'package:care_flow/screens/nurse_navigation_screen.dart'; // For navigation (map)
-import 'package:care_flow/screens/messaging_page.dart'; // For messaging (ChatListPage)
 import 'package:care_flow/screens/role_router_screen.dart'; // For logout navigation
+import 'package:care_flow/screens/nurse_patient_list_screen.dart'; // For My Patients
+import 'package:care_flow/screens/nurse_appointments_screen.dart'; // For Nurse Appointments
 import 'package:care_flow/screens/nurse_alerts_management_screen.dart'; // Import the new NurseAlertsManagementScreen
 import 'package:care_flow/screens/nurse_reports_screen.dart'; // Import NurseReportsScreen
-// Import the AddAppointmentScreen
+import 'package:care_flow/screens/add_patient_screen.dart'; // For adding/claiming patients
+import 'package:care_flow/screens/visit_schedule_page.dart'; // For nurse's visit schedule
 import 'package:care_flow/screens/patient_profile_page.dart'; // Import the PatientProfilePage
 import 'package:care_flow/screens/appointment_details_page.dart'; // Import AppointmentDetailsPage
+import 'package:care_flow/screens/messaging_page.dart'; // For messaging (ChatListPage)
+import 'package:care_flow/screens/nurse_navigation_screen.dart'; // For Nurse Navigation
+
+// IMPORTANT: Ensure these model imports are correct and the files exist and are valid.
+import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
+
 import 'package:intl/intl.dart'; // For date formatting
 
 class CaregiverDashboard extends StatefulWidget {
@@ -64,7 +66,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           .doc(_currentNurseId)
           .get();
 
-      if (!currentContext.mounted) return;
+      if (!currentContext.mounted) return; // Check mounted after await
 
       if (userDoc.exists) {
         _nurseName = userDoc.get('fullName') ?? 'Nurse';
@@ -142,7 +144,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   }
 
   Future<void> _logout() async {
-    final currentContext = context;
+    final currentContext = context; // Capture context
     setState(() {
       _isLoadingDashboard = true; // Show loading while logging out
     });
@@ -568,15 +570,17 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                     color: Colors.redAccent.shade700,
                   ),
                   QuickActionButton(
-                    label: 'Emergency Alerts',
+                    label: 'Emergency Alerts', // This button
                     icon: Icons.notifications_active,
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Emergency Alerts functionality coming soon!')),
+                      // Navigate to the comprehensive NurseAlertsManagementScreen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
                       );
-                      debugPrint('Emergency Alerts pressed');
+                      debugPrint('Emergency Alerts pressed - Navigating to NurseAlertsManagementScreen');
                     },
-                    color: Colors.orange.shade700,
+                    color: Colors.red.shade700, // Make it stand out
                   ),
                   QuickActionButton(
                     label: 'Generate Report',
@@ -591,7 +595,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                     color: Colors.teal,
                   ),
                   QuickActionButton(
-                    label: 'Manage Alerts',
+                    label: 'Manage Alerts', // This button
                     icon: Icons.list_alt,
                     onPressed: () {
                       Navigator.push(
