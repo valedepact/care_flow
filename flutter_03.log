@@ -1,0 +1,71 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run
+
+## exception
+
+ExistingDartDevelopmentServiceException: DartDevelopmentServiceException: JSON-RPC error 100: Existing VM service clients prevent DDS from taking control.
+
+```
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.32.5, on Microsoft Windows [Version 10.0.26100.4652], locale en-UG) [1,661ms]
+    [32m•[39m Flutter version 3.32.5 on channel stable at C:\Users\CATHY\Downloads\flutter_windows_3.32.5-stable\flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision fcf2c11572 (3 weeks ago), 2025-06-24 11:44:07 -0700
+    [32m•[39m Engine revision dd93de6fb1
+    [32m•[39m Dart version 3.8.1
+    [32m•[39m DevTools version 2.45.1
+
+[32m[✓][39m Windows Version (11 Home 64-bit, 24H2, 2009) [5.2s]
+
+[32m[✓][39m Android toolchain - develop for Android devices (Android SDK version 35.0.1) [18.8s]
+    [32m•[39m Android SDK at C:\Users\CATHY\AppData\Local\Android\sdk
+    [32m•[39m Platform android-35, build-tools 35.0.1
+    [32m•[39m Java binary at: C:\Program Files\Android\Android Studio3\jbr\bin\java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version OpenJDK Runtime Environment (build 21.0.6+-13368085-b895.109)
+    [32m•[39m All Android licenses accepted.
+
+[32m[✓][39m Chrome - develop for the web [73ms]
+    [32m•[39m Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[31m[✗][39m Visual Studio - develop Windows apps [69ms]
+    [31m✗[39m Visual Studio not installed; this is necessary to develop Windows apps.
+      Download at https://visualstudio.microsoft.com/downloads/.
+      Please install the "Desktop development with C++" workload, including all of its default components
+
+[32m[✓][39m Android Studio (version 2024.3.2) [52ms]
+    [32m•[39m Android Studio at C:\Program Files\Android\Android Studio3
+    [32m•[39m Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    [32m•[39m Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    [32m•[39m Java version OpenJDK Runtime Environment (build 21.0.6+-13368085-b895.109)
+
+[32m[✓][39m VS Code (version 1.102.1) [39ms]
+    [32m•[39m VS Code at C:\Users\CATHY\AppData\Local\Programs\Microsoft VS Code
+    [32m•[39m Flutter extension version 3.114.0
+
+[32m[✓][39m Connected device (3 available) [405ms]
+    [32m•[39m Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.26100.4652]
+    [32m•[39m Chrome (web)      • chrome  • web-javascript • Google Chrome 138.0.7204.101
+    [32m•[39m Edge (web)        • edge    • web-javascript • Microsoft Edge 138.0.3351.83
+
+[33m[!][39m Network resources [23.2s]
+    [31m✗[39m A cryptographic error occurred while checking "https://pub.dev/": Connection terminated during handshake
+      You may be experiencing a man-in-the-middle attack, your network may be compromised, or you may have malware installed on your computer.
+    [31m✗[39m A network error occurred while checking "https://storage.googleapis.com/": Failed host lookup: 'storage.googleapis.com'
+    [31m✗[39m A network error occurred while checking "https://maven.google.com/": Failed host lookup: 'maven.google.com'
+    [31m✗[39m A network error occurred while checking "https://cocoapods.org/": Failed host lookup: 'cocoapods.org'
+    [31m✗[39m A network error occurred while checking "https://github.com/": Failed host lookup: 'github.com'
+
+[33m![39m Doctor found issues in 2 categories.
+```
