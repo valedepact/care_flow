@@ -7,11 +7,27 @@ import 'package:care_flow/screens/visit_schedule_page.dart'; // Keep other neces
 // Note: MyHomePage and DashboardPage are now accessed via RoleRouterScreen,
 // so direct imports here are not strictly necessary if they are only routes.
 
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:care_flow/models/patient.dart';
+import 'package:care_flow/models/alert_model.dart';
+import 'package:care_flow/models/patient_alert.dart';
+import 'package:care_flow/models/appointment.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Required for Firebase initialization
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // Use generated options
   );
+  await Hive.initFlutter(); // Initialize Hive for Flutter
+  Hive.registerAdapter(PatientAdapter());
+  Hive.registerAdapter(AlertAdapter());
+  Hive.registerAdapter(PatientAlertAdapter());
+  Hive.registerAdapter(AppointmentAdapter());
+  await Hive.openBox<Patient>('patients');
+  await Hive.openBox<Alert>('alerts');
+  await Hive.openBox<PatientAlert>('patient_alerts');
+  await Hive.openBox<Appointment>('appointments');
   runApp(const MyApp());
 }
 

@@ -18,6 +18,7 @@ import 'package:care_flow/models/patient.dart'; // Import the Patient model
 import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
 
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:hive/hive.dart';
 
 class CaregiverDashboard extends StatefulWidget {
   const CaregiverDashboard({super.key});
@@ -37,10 +38,10 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   @override
   void initState() {
     super.initState();
-    _fetchDashboardData(); // Renamed to fetch all dashboard data
+    _loadDashboardPatients();
   }
 
-  Future<void> _fetchDashboardData() async {
+  Future<void> _loadDashboardPatients() async {
     final currentContext = context;
     setState(() {
       _isLoadingDashboard = true; // Start loading for the entire dashboard
@@ -58,6 +59,13 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     }
 
     _currentNurseId = currentUser.uid;
+
+    // 1. Load from Hive first (fast, offline)
+    var patientBox = Hive.box<Patient>('patients');
+    setState(() {
+      _patients = patientBox.values.toList().take(5).toList();
+      _isLoadingDashboard = false;
+    });
 
     try {
       // 1. Fetch Nurse Data
@@ -89,6 +97,10 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
         return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
 
+      // Update Hive with latest patients (replace all for simplicity)
+      await patientBox.clear();
+      await patientBox.addAll(_patients);
+
       // 3. Fetch Upcoming Visits for this Nurse
       QuerySnapshot visitSnapshot = await FirebaseFirestore.instance
           .collection('appointments')
@@ -119,7 +131,6 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           assignedToId: data['assignedToId'],
           assignedToName: data['assignedToName'],
           createdAt: (data['createdAt'] as Timestamp).toDate(),
-          statusColor: Appointment.getColorForStatus(parsedStatus),
         );
       }).toList();
 

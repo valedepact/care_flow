@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For Color
+import 'package:hive/hive.dart';
+part 'alert_model.g.dart';
 
 enum AlertStatus {
   active,
@@ -9,16 +11,27 @@ enum AlertStatus {
   pending,  // NEW: For pending alerts from patients
 }
 
-class Alert {
+@HiveType(typeId: 1)
+class Alert extends HiveObject {
+  @HiveField(0)
   final String id; // Document ID
+  @HiveField(1)
   final String patientId; // The ID of the patient this alert is for
+  @HiveField(2)
   final String? patientName; // Optional: Patient's name for display
+  @HiveField(3)
   final String title;
+  @HiveField(4)
   final String message;
+  @HiveField(5)
   final DateTime timestamp;
+  @HiveField(6)
   final String createdByUserId; // User who created the alert (e.g., nurse, admin)
+  @HiveField(7)
   final String createdByUserName; // Name of the user who created the alert
+  @HiveField(8)
   final String status; // Changed to String to handle 'pending', 'active', 'dismissed', etc.
+  @HiveField(9)
   final String type; // NEW: e.g., 'emergency', 'reminder', 'info'
 
   Alert({

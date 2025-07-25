@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For Color
+import 'package:hive/hive.dart';
+part 'patient_alert.g.dart';
 
 enum AlertStatus {
   active,
@@ -8,15 +10,25 @@ enum AlertStatus {
   expired,
 }
 
-class PatientAlert {
+@HiveType(typeId: 2)
+class PatientAlert extends HiveObject {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String patientId;
+  @HiveField(2)
   final String? patientName; // Can be null if the alert is for a nurse, but for patient view, it's their own name
+  @HiveField(3)
   final String description;
+  @HiveField(4)
   final String alertType; // e.g., "Medication Alert", "Appointment Reminder", "General Reminder"
+  @HiveField(5)
   final DateTime scheduledDateTime;
+  @HiveField(6)
   final AlertStatus status;
+  @HiveField(7)
   final String? createdBy; // UID of the user who created the alert
+  @HiveField(8)
   final String? createdByName; // Name of the user who created the alert
 
   PatientAlert({

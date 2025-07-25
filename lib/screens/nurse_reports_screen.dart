@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:hive/hive.dart';
+import 'package:care_flow/models/appointment.dart';
+import 'package:care_flow/models/patient.dart';
 // Import Patient model (for total patients)
 // Import Appointment model (for visit summary)
 // For date formatting
@@ -33,49 +36,72 @@ class _NurseReportsScreenState extends State<NurseReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchReportData();
+    _loadReportData();
   }
 
-  Future<void> _fetchReportData() async {
+  Future<void> _loadReportData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
+    // 1. Load from Hive first
+    var appointmentBox = Hive.box<Appointment>('appointments');
+    var patientBox = Hive.box<Patient>('patients');
+    final DateTime thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final appointments = appointmentBox.values.where((a) => a.dateTime.isAfter(thirtyDaysAgo)).toList();
+    final patients = patientBox.values.toList();
+
+    _totalVisitsLast30Days = appointments.length;
+    _completedVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.completed).length;
+    _missedVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.missed).length;
+    _upcomingVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.upcoming).length;
+    _cancelledVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.cancelled).length;
+
+    _totalPatients = patients.length;
+    _stablePatients = (_totalPatients * 0.8).round();
+    _improvingPatients = (_totalPatients * 0.1).round();
+    _criticalPatients = _totalPatients - _stablePatients - _improvingPatients;
+    if (_criticalPatients < 0) _criticalPatients = 0;
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    // 2. Fetch from Firestore, update Hive, and refresh UI
     try {
-      // --- Fetch Patient Visit Summary (Last 30 Days) ---
-      final DateTime thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
       QuerySnapshot appointmentSnapshot = await FirebaseFirestore.instance
           .collection('appointments')
           .where('dateTime', isGreaterThanOrEqualTo: thirtyDaysAgo)
           .get();
+      List<Appointment> firestoreAppointments = appointmentSnapshot.docs.map((doc) =>
+        Appointment.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)
+      ).toList();
+      await appointmentBox.clear();
+      await appointmentBox.addAll(firestoreAppointments);
 
-      _totalVisitsLast30Days = appointmentSnapshot.docs.length;
-      _completedVisitsLast30Days = appointmentSnapshot.docs
-          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'completed')
-          .length;
-      _missedVisitsLast30Days = appointmentSnapshot.docs
-          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'missed')
-          .length;
-      _upcomingVisitsLast30Days = appointmentSnapshot.docs
-          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'upcoming')
-          .length;
-      _cancelledVisitsLast30Days = appointmentSnapshot.docs
-          .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'cancelled')
-          .length;
-
-      // --- Fetch Overall Patient Status Summary ---
       QuerySnapshot patientSnapshot = await FirebaseFirestore.instance.collection('patients').get();
-      _totalPatients = patientSnapshot.docs.length;
+      List<Patient> firestorePatients = patientSnapshot.docs.map((doc) =>
+        Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)
+      ).toList();
+      await patientBox.clear();
+      await patientBox.addAll(firestorePatients);
 
-      // For 'stable', 'improving', 'critical' patients:
-      // This would ideally come from a 'status' field on the patient document,
-      // or be derived from recent medical records/notes.
-      // For now, we'll use dummy values or simple distribution.
-      _stablePatients = (_totalPatients * 0.8).round(); // 80% stable
-      _improvingPatients = (_totalPatients * 0.1).round(); // 10% improving
-      _criticalPatients = _totalPatients - _stablePatients - _improvingPatients; // Remaining are critical
-      if (_criticalPatients < 0) _criticalPatients = 0; // Ensure non-negative
+      // Recalculate with latest data
+      final appointments = appointmentBox.values.where((a) => a.dateTime.isAfter(thirtyDaysAgo)).toList();
+      final patients = patientBox.values.toList();
+
+      _totalVisitsLast30Days = appointments.length;
+      _completedVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.completed).length;
+      _missedVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.missed).length;
+      _upcomingVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.upcoming).length;
+      _cancelledVisitsLast30Days = appointments.where((a) => a.status == AppointmentStatus.cancelled).length;
+
+      _totalPatients = patients.length;
+      _stablePatients = (_totalPatients * 0.8).round();
+      _improvingPatients = (_totalPatients * 0.1).round();
+      _criticalPatients = _totalPatients - _stablePatients - _improvingPatients;
+      if (_criticalPatients < 0) _criticalPatients = 0;
 
       if (mounted) {
         setState(() {
@@ -83,7 +109,7 @@ class _NurseReportsScreenState extends State<NurseReportsScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching report data: $e'); // Changed print to debugPrint
+      debugPrint('Error fetching report data: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to load report data: $e';

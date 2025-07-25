@@ -10,6 +10,7 @@ import 'package:care_flow/screens/add_appointment_screen.dart'; // Import AddApp
 import 'package:google_maps_flutter/google_maps_flutter.dart'; // For LatLng
 import 'package:care_flow/screens/select_location_on_map_screen.dart'; // NEW: Import the map selection screen
 import 'package:care_flow/screens/edit_patient_screen.dart'; // Explicitly import EditPatientScreen
+import 'package:hive/hive.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final String? patientId; // Now optional
@@ -121,11 +122,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
     String? targetPatientId;
     if (widget.patientId != null && widget.patientId!.isNotEmpty) {
-      // If patientId is provided (e.g., nurse viewing a patient's profile)
       targetPatientId = widget.patientId;
       debugPrint('PatientProfilePage: _fetchPatientDetails - Using widget.patientId: $targetPatientId');
     } else {
-      // If patientId is NOT provided (e.g., patient viewing their own profile)
       if (_currentUser == null) {
         if (currentContext.mounted) {
           setState(() {
@@ -149,6 +148,33 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       }
       debugPrint('PatientProfilePage: _fetchPatientDetails - No targetPatientId, setting error.');
       return;
+    }
+
+    // 1. Try to load from Hive first
+    var patientBox = Hive.box<Patient>('patients');
+    Patient? localPatient;
+    try {
+      localPatient = patientBox.values.firstWhere((p) => p.id == targetPatientId);
+    } catch (_) {
+      localPatient = null;
+    }
+    if (localPatient != null) {
+      setState(() {
+        _patient = localPatient;
+        _contactController.text = _patient!.contact;
+        _addressController.text = _patient!.address;
+        _emergencyContactNameController.text = _patient!.emergencyContactName ?? '';
+        _emergencyContactNumberController.text = _patient!.emergencyContactNumber ?? '';
+        if (_patient!.dob != null) {
+          _dobController.text = DateFormat('yyyy-MM-dd').format(_patient!.dob!);
+        } else {
+          _dobController.clear();
+        }
+        _locationNameController.text = _patient!.locationName ?? '';
+        _latitudeController.text = _patient!.latitude?.toString() ?? '';
+        _longitudeController.text = _patient!.longitude?.toString() ?? '';
+        _isLoading = false;
+      });
     }
 
     try {
@@ -178,22 +204,28 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           _locationNameController.text = _patient!.locationName ?? '';
           _latitudeController.text = _patient!.latitude?.toString() ?? '';
           _longitudeController.text = _patient!.longitude?.toString() ?? '';
-
           _isLoading = false;
         });
+        // Update Hive with the latest patient data
+        int localIndex = patientBox.values.toList().indexWhere((p) => p.id == doc.id);
+        if (localIndex != -1) {
+          await patientBox.putAt(localIndex, _patient!);
+        } else {
+          await patientBox.add(_patient!);
+        }
         debugPrint('PatientProfilePage: _fetchPatientDetails - Patient data loaded successfully for ID: ${_patient!.id}');
       } else {
         setState(() {
-          _errorMessage = 'Patient profile not found for ID: $targetPatientId.';
+          _errorMessage = 'Patient not found.';
           _isLoading = false;
         });
         debugPrint('PatientProfilePage: _fetchPatientDetails - Patient document not found for ID: $targetPatientId');
       }
     } catch (e) {
-      debugPrint('PatientProfilePage: Error fetching patient details: $e');
+      debugPrint('PatientProfilePage: _fetchPatientDetails - Error fetching patient details: $e');
       if (currentContext.mounted) {
         setState(() {
-          _errorMessage = 'Failed to load profile: $e';
+          _errorMessage = 'Error loading patient details: $e';
           _isLoading = false;
         });
       }

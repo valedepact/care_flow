@@ -9,6 +9,9 @@ import 'package:intl/intl.dart'; // For date formatting
 import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
 import 'package:flutter/foundation.dart'; // NEW: Re-added for kIsWeb
 import 'dart:js_interop'; // Recommended: Import dart:js_interop
+import 'package:http/http.dart' as http; // Import http for Directions API
+import 'dart:math'; // Import math for Haversine formula
+import 'dart:convert'; // Import for jsonDecode
 // Required for accessing window/globalThis properties
 
 // Define a JS interop interface for the global window object
@@ -19,6 +22,8 @@ external JSObject get window; // This represents the global 'window' object in J
 extension WindowExtension on JSObject {
   external bool? get googleMapsApiReady; // Property on window to check API readiness
 }
+
+const String googleDirectionsApiKey = 'AIzaSyDMFS9Xtlw7YAKZaPez2cnVn1-sON8ZVhk'; // TODO: Replace with your real API key
 
 class NurseNavigationScreen extends StatefulWidget {
   const NurseNavigationScreen({super.key});
@@ -37,6 +42,8 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
 
   List<Patient> _allAssignedPatients = []; // To store all assigned patients
   Patient? _selectedPatientForNavigation; // The patient selected for directions
+  String? _etaString; // Store ETA string
+  String? _distanceString; // Store distance string
 
   bool _googleMapsApiLoaded = false; // Flag to track API readiness for web
   bool _isLocationDetermined = false; // Flag to track if nurse location has been determined
@@ -82,6 +89,8 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
       _polylines.clear(); // Clear existing polylines
       _allAssignedPatients.clear(); // Clear previous patient list
       _selectedPatientForNavigation = null; // Clear selected patient
+      _etaString = null; // Clear ETA string
+      _distanceString = null; // Clear distance string
     });
 
     User? currentUser = FirebaseAuth.instance.currentUser;
@@ -321,34 +330,84 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
     );
   }
 
-  // Method to draw a polyline between nurse and selected patient
-  void _drawRoutePolyline() {
-    _polylines.clear(); // Clear any existing polylines
-
+  // Replace _drawRoutePolyline with real Directions API logic
+  Future<void> _drawRoutePolyline() async {
+    _polylines.clear();
     if (_currentNursePosition != null &&
         _selectedPatientForNavigation != null &&
         _selectedPatientForNavigation!.latitude != null &&
         _selectedPatientForNavigation!.longitude != null) {
-
-      final PolylineId polylineId = const PolylineId('nurse_to_patient_route');
-      final Polyline polyline = Polyline(
-        polylineId: polylineId,
-        points: [
-          _currentNursePosition!,
-          LatLng(_selectedPatientForNavigation!.latitude!, _selectedPatientForNavigation!.longitude!),
-        ],
-        color: Colors.blue, // Color of the route line
-        width: 5, // Width of the route line
-        geodesic: true, // Follows the curvature of the earth
-      );
-
-      setState(() {
-        _polylines.add(polyline);
-      });
-      debugPrint('NurseNavigationScreen: Polyline drawn from nurse to patient.');
-    } else {
-      debugPrint('NurseNavigationScreen: Cannot draw polyline: Nurse or patient location missing.');
+      final origin = '${_currentNursePosition!.latitude},${_currentNursePosition!.longitude}';
+      final destination = '${_selectedPatientForNavigation!.latitude},${_selectedPatientForNavigation!.longitude}';
+      final url =
+          'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&key=$googleDirectionsApiKey&mode=driving';
+      try {
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['routes'] != null && data['routes'].isNotEmpty) {
+            final route = data['routes'][0];
+            final polyline = route['overview_polyline']['points'];
+            final points = _decodePolyline(polyline);
+            final distance = route['legs'][0]['distance']['text'];
+            final duration = route['legs'][0]['duration']['text'];
+            setState(() {
+              _polylines.add(Polyline(
+                polylineId: const PolylineId('directions_route'),
+                points: points,
+                color: Colors.blue,
+                width: 5,
+              ));
+              _etaString = duration;
+              _distanceString = distance;
+            });
+          } else {
+            setState(() {
+              _etaString = 'No route';
+              _distanceString = '';
+            });
+          }
+        } else {
+          setState(() {
+            _etaString = 'Error';
+            _distanceString = '';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _etaString = 'Error';
+          _distanceString = '';
+        });
+      }
     }
+  }
+
+  // Polyline decoder for Google encoded polyline
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> polyline = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+      polyline.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+    return polyline;
   }
 
   // Method to launch external map application for directions
@@ -425,16 +484,43 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
           ),
         ),
       )
-          : GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _currentNursePosition ?? const LatLng(0.3392253, 32.5711991), // Default to Kampala if nurse location not available
-          zoom: 10.0,
-        ),
-        markers: _markers, // Display all markers
-        polylines: _polylines, // Display polylines
-        myLocationEnabled: true, // Show user's current location dot
-        myLocationButtonEnabled: true, // Show button to recenter on user's location
+          : Stack(
+        children: [
+          GoogleMap(
+            onMapCreated: _onMapCreated,
+            initialCameraPosition: CameraPosition(
+              target: _currentNursePosition ?? const LatLng(0.3392253, 32.5711991),
+              zoom: 14.0,
+            ),
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+          ),
+          if (_selectedPatientForNavigation != null && _etaString != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Card(
+                color: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'ETA:  {_etaString ?? "--"}   Distance:  {_distanceString ?? "--"}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -477,5 +563,20 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // Position FABs to the right
     );
+  }
+
+  // Helper to calculate distance as a string
+  String _calculateDistanceString(LatLng start, LatLng end) {
+    const double earthRadiusKm = 6371.0;
+    double dLat = (end.latitude - start.latitude) * (3.141592653589793 / 180.0);
+    double dLon = (end.longitude - start.longitude) * (3.141592653589793 / 180.0);
+    double a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(start.latitude * (3.141592653589793 / 180.0)) *
+            cos(end.latitude * (3.141592653589793 / 180.0)) *
+            (sin(dLon / 2) * sin(dLon / 2));
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distanceKm = earthRadiusKm * c;
+    return distanceKm.toStringAsFixed(2) + ' km';
   }
 }

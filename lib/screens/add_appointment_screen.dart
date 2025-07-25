@@ -309,7 +309,6 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
           assignedToId: _currentUser!.uid,
           assignedToName: _currentUserName!,
           createdAt: DateTime.now(), // Will be overwritten by serverTimestamp in toFirestore
-          statusColor: Appointment.getColorForStatus(AppointmentStatus.upcoming), // Initial color
         );
 
         await FirebaseFirestore.instance.collection('appointments').add(newAppointment.toFirestore());
