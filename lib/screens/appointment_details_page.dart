@@ -46,7 +46,23 @@ class AppointmentDetailsPage extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 16), // Added space
+
+            // NEW: Display time remaining or overdue status prominently
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                appointment.isOverdue
+                    ? 'Status: Overdue'
+                    : 'Time Remaining: ${appointment.getTimeRemainingString()}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: appointment.isOverdue ? Colors.red : Colors.blue.shade800,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
+
 
             // Details Section
             Card(

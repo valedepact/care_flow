@@ -24,6 +24,7 @@ class Patient {
   final String? locationName; // New: A descriptive name for the patient's location
   final DateTime? dob; // NEW: Date of Birth as DateTime
   final int? calculatedAge; // NEW: Calculated age as int
+  double? distanceFromNurse; // NEW: Added for sorting patients by distance
 
   Patient({
     required this.id,
@@ -49,6 +50,7 @@ class Patient {
     this.locationName,
     this.dob, // Include in constructor
     this.calculatedAge, // Include in constructor
+    this.distanceFromNurse, // Include in constructor
   });
 
   // Factory constructor to create a Patient from a Firestore DocumentSnapshot
@@ -97,6 +99,8 @@ class Patient {
       locationName: data['locationName'],
       dob: parsedDob, // Parse DOB
       calculatedAge: calculatedAge, // Parse calculatedAge
+      // distanceFromNurse is not stored in Firestore, so it's not parsed here.
+      // It will be calculated and set after fetching from Firestore.
     );
   }
 

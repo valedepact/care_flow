@@ -7,7 +7,8 @@ enum AppointmentStatus {
   completed,
   cancelled,
   rescheduled,
-  missed, // Added 'missed' status
+  missed,
+  overdue, // NEW: Added 'overdue' status
 }
 
 class Appointment {
@@ -17,7 +18,7 @@ class Appointment {
   final String type; // e.g., 'Check-up', 'Consultation', 'Vaccination'
   final DateTime dateTime;
   final String location;
-  final AppointmentStatus status;
+  final AppointmentStatus status; // This will now represent the *current* status from Firestore
   final String notes;
   final String? assignedToId; // ID of the nurse/caregiver assigned
   final String? assignedToName; // Name of the nurse/caregiver assigned
@@ -39,25 +40,36 @@ class Appointment {
     required this.statusColor, // Must be provided during construction
   });
 
+  // Factory constructor to create a Prescription from a Firestore DocumentSnapshot
   factory Appointment.fromFirestore(Map<String, dynamic> data, String id) {
     AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
           (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
       orElse: () => AppointmentStatus.upcoming,
     );
 
+    // Determine if the appointment is overdue based on its dateTime and current time
+    final DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
+    final bool isOverdue = appointmentDateTime.isBefore(DateTime.now()) &&
+        (parsedStatus == AppointmentStatus.upcoming || parsedStatus == AppointmentStatus.rescheduled);
+
+    // If it's overdue, override the parsed status to 'overdue'
+    if (isOverdue) {
+      parsedStatus = AppointmentStatus.overdue;
+    }
+
     return Appointment(
       id: id,
       patientId: data['patientId'] ?? '',
       patientName: data['patientName'] ?? 'Unknown Patient',
       type: data['type'] ?? 'General Consultation',
-      dateTime: (data['dateTime'] as Timestamp).toDate(),
+      dateTime: appointmentDateTime, // Use the parsed DateTime
       location: data['location'] ?? 'N/A',
-      status: parsedStatus,
+      status: parsedStatus, // Use the potentially overridden status
       notes: data['notes'] ?? '',
       assignedToId: data['assignedToId'],
       assignedToName: data['assignedToName'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
-      statusColor: Appointment.getColorForStatus(parsedStatus), // Derive color here
+      statusColor: Appointment.getColorForStatus(parsedStatus), // Derive color based on final status
     );
   }
 
@@ -88,7 +100,32 @@ class Appointment {
       case AppointmentStatus.rescheduled:
         return Colors.orange.shade600;
       case AppointmentStatus.missed:
-        return Colors.grey.shade700; // Corrected: Using a valid shade of grey
+        return Colors.grey.shade700;
+      case AppointmentStatus.overdue: // NEW: Color for overdue appointments
+        return Colors.purple.shade700; // A distinct color for overdue
+    }
+  }
+
+  // NEW: Getter to check if the appointment is overdue
+  bool get isOverdue {
+    return dateTime.isBefore(DateTime.now()) &&
+        (status == AppointmentStatus.upcoming || status == AppointmentStatus.rescheduled);
+  }
+
+  // NEW: Method to get time remaining as a formatted string
+  String getTimeRemainingString() {
+    final Duration difference = dateTime.difference(DateTime.now());
+
+    if (difference.isNegative) {
+      return 'Overdue';
+    } else if (difference.inDays > 0) {
+      return 'in ${difference.inDays} day${difference.inDays == 1 ? '' : 's'}';
+    } else if (difference.inHours > 0) {
+      return 'in ${difference.inHours} hour${difference.inHours == 1 ? '' : 's'}';
+    } else if (difference.inMinutes > 0) {
+      return 'in ${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'}';
+    } else {
+      return 'now';
     }
   }
 }

@@ -38,7 +38,7 @@ dependencies:
   firebase_auth: ^4.17.8
   intl: any
   table_calendar: ^3.0.9 # NEW: Add this line for the calendar widget
-
+  url_launcher: ^6.3.0
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8

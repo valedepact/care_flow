@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:care_flow/screens/login_page.dart'; // Import LoginPage for navigation
 import 'package:care_flow/screens/register_page.dart'; // Import RegisterCard from its dedicated file
+import 'package:url_launcher/url_launcher.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -9,25 +10,14 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
-  // These variables are no longer needed in DashboardPage as it's a landing page
-  // String _patientName = 'Loading...';
-  // String _patientId = '';
-  // bool _isLoadingUserData = true; // Separate loading for user data
-  //
-  // Appointment? _upcomingAppointment; // To store the fetched upcoming appointment
-  // bool _isLoadingUpcomingAppointment = true;
-  // String _upcomingAppointmentErrorMessage = '';
-
-  @override
-  void initState() {
-    super.initState();
-    // This DashboardPage is now the initial landing page.
-    // It should not fetch patient data directly unless a user is already logged in.
-    // The main purpose here is to present login/register options.
-    // We can keep the data fetching logic for the actual PatientDashboardPage.
+void _launchWebsite() async {
+  final Uri url = Uri.parse('https://careflow.tiiny.site');
+  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    throw Exception('Could not launch $url');
   }
+}
 
+class _DashboardPageState extends State<DashboardPage> {
   // Helper method to build primary CTA buttons
   Widget _buildCTAButton(BuildContext context, String text, VoidCallback onPressed) {
     return ElevatedButton(
@@ -192,6 +182,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           child: _buildOutlinedCTAButton(context, 'Learn More', () {
                             // Handle Learn More action (e.g., scroll to a section, open a URL)
                             debugPrint('Learn More button pressed');
+                            _launchWebsite(); // Apply the action here as well
                           }),
                         ),
                       ],
@@ -215,7 +206,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         const SizedBox(height: 16),
                         _buildOutlinedCTAButton(context, 'Learn More', () {
                           debugPrint('Learn More button pressed');
+                          _launchWebsite();
                         }),
+
                       ],
                     );
                   }

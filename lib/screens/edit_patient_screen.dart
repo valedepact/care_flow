@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:care_flow/models/patient.dart'; // Import the Patient model
-// For debugPrint
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:care_flow/screens/select_location_on_map_screen.dart'; // NEW: Import SelectLocationOnMapScreen
+import 'package:google_maps_flutter/google_maps_flutter.dart'; // NEW: Import LatLng
 
 class EditPatientScreen extends StatefulWidget {
   final Patient patient; // The patient object to be edited
@@ -58,7 +59,12 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
     _latitudeController = TextEditingController(text: widget.patient.latitude?.toString() ?? ''); // Initialize latitude
     _longitudeController = TextEditingController(text: widget.patient.longitude?.toString() ?? ''); // Initialize longitude
 
-    _selectedGender = widget.patient.gender;
+    // FIX: Ensure _selectedGender is a valid value from _genders list
+    if (_genders.contains(widget.patient.gender)) {
+      _selectedGender = widget.patient.gender;
+    } else {
+      _selectedGender = null; // Set to null if current gender is not in the list
+    }
   }
 
   @override
@@ -105,6 +111,31 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
       age--;
     }
     return age;
+  }
+
+  // NEW: Function to navigate to map and get result
+  Future<void> _selectLocationFromMap() async {
+    final LatLng? initialLocation = (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+        ? LatLng(double.parse(_latitudeController.text), double.parse(_longitudeController.text))
+        : null;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SelectLocationOnMapScreen(
+          initialLocation: initialLocation,
+          initialLocationName: _locationNameController.text.trim(),
+        ),
+      ),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _latitudeController.text = result['latitude']?.toStringAsFixed(6) ?? '';
+        _longitudeController.text = result['longitude']?.toStringAsFixed(6) ?? '';
+        _locationNameController.text = result['locationName'] ?? '';
+      });
+    }
   }
 
   Future<void> _updatePatient() async {
@@ -419,15 +450,29 @@ class _EditPatientScreenState extends State<EditPatientScreen> {
               ),
               const SizedBox(height: 16),
 
-              TextFormField(
-                controller: _locationNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Location Name (e.g., Home, Clinic)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.place),
-                ),
-                textInputAction: TextInputAction.next,
-                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+              // Location Name and Select from Map Button
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _locationNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Location Name (e.g., Home, Clinic)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.place),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.map, size: 30),
+                    onPressed: _selectLocationFromMap, // Call the new function
+                    tooltip: 'Select location on map',
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 

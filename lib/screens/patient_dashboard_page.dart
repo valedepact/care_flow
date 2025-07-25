@@ -2,20 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:intl/intl.dart'; // For date formatting
-
-// Import the Patient model
 import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
-
 import 'package:care_flow/screens/emergency_alerts_page.dart';
 import 'package:care_flow/screens/alert_page.dart'; // Import the revamped AlertsPage (for scheduling)
-// import 'package:care_flow/screens/my_alerts_screen.dart'; // Import the new MyAlertsScreen (for viewing) - commented out as it's not provided yet
+import 'package:care_flow/screens/my_alerts_screen.dart'; // Import the new MyAlertsScreen (for viewing)
 import 'package:care_flow/screens/role_router_screen.dart'; // Import RoleRouterScreen for logout navigation
 import 'package:care_flow/screens/my_appointments_page.dart'; // Import MyAppointmentsPage
 import 'package:care_flow/screens/medical_records_page.dart'; // Corrected: Import MedicalRecordsPage
 import 'package:care_flow/screens/patient_prescriptions_screen.dart'; // Import PatientPrescriptionsScreen
-import 'package:care_flow/screens/patient_notes_screen.dart'; // Import PatientNotesScreen
+import 'package:care_flow/screens/patient_notes_screen.dart'; // Corrected: Import PatientNotesScreen
 import 'package:care_flow/screens/messaging_page.dart'; // Import the MessagingPage (ChatListPage)
 import 'package:care_flow/screens/appointment_details_page.dart'; // Import AppointmentDetailsPage
+import 'package:care_flow/screens/patient_profile_page.dart'; // NEW: Import PatientProfilePage
 
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -372,13 +370,42 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     icon: Icons.list_alt, // Icon for a list/alerts
                     label: 'My Alerts',
                     onPressed: () {
-                      // Implement navigation to MyAlertsScreen if you create one for patients
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('My Alerts functionality coming soon!')),
-                      );
-                      debugPrint('My Alerts pressed from Patient Dashboard');
+                      // Navigate to MyAlertsScreen
+                      if (_patientId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const MyAlertsScreen()),
+                        );
+                        debugPrint('My Alerts pressed from Patient Dashboard - Navigating to My Alerts Screen');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient ID not available. Cannot view alerts.')),
+                        );
+                      }
                     },
                     color: Colors.deepPurple, // A distinct color
+                  ),
+                  // NEW: Edit Profile button for patients
+                  _buildDashboardButton(
+                    context,
+                    icon: Icons.edit,
+                    label: 'Edit Profile',
+                    onPressed: () {
+                      if (_patientId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PatientProfilePage(), // Correctly points to PatientProfilePage
+                          ),
+                        );
+                        debugPrint('Edit Profile pressed - Navigating to PatientProfilePage for self-edit');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient ID not available. Cannot edit profile.')),
+                        );
+                      }
+                    },
+                    color: Colors.blueGrey, // A distinct color
                   ),
                 ],
               ),

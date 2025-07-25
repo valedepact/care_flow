@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth to get current nurse's UID
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:care_flow/models/patient.dart'; // Import the Patient model
+import 'package:intl/intl.dart'; // For DateFormat
+import 'package:care_flow/screens/select_location_on_map_screen.dart'; // NEW: Import SelectLocationOnMapScreen
+import 'package:google_maps_flutter/google_maps_flutter.dart'; // NEW: Import LatLng
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key});
@@ -11,73 +14,95 @@ class AddPatientScreen extends StatefulWidget {
 }
 
 class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerProviderStateMixin {
-  // Controllers for 'Add New Patient' tab
-  final GlobalKey<FormState> _addPatientFormKey = GlobalKey<FormState>();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _dateOfBirthController = TextEditingController();
-  final TextEditingController _contactNumberController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _conditionController = TextEditingController();
-  final TextEditingController _emergencyContactNameController = TextEditingController();
-  final TextEditingController _emergencyContactNumberController = TextEditingController();
-
-  String? _selectedGender;
-  bool _isLoadingAddPatient = false; // Loading for adding new patient
-
-  final List<String> _genders = ['Male', 'Female', 'Other'];
-
-  // For 'Claim Patient' tab
-  // Replaced single boolean with a Set for per-patient loading state
-  final Set<String> _loadingClaimingIds = {};
-  String? _currentNurseId; // To store the logged-in nurse's UID
-
-  // Tab Controller
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _getCurrentNurseId(); // Get the current nurse's ID on init
-  }
-
-  // Fetch the current logged-in nurse's UID
-  void _getCurrentNurseId() {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        _currentNurseId = user.uid;
-      });
-      debugPrint('Current Nurse ID: $_currentNurseId');
-    } else {
-      debugPrint('No nurse user logged in.');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No nurse logged in. Please log in to claim patients.')),
-        );
-      }
-    }
   }
 
   @override
   void dispose() {
-    _fullNameController.dispose();
-    _dateOfBirthController.dispose();
-    _contactNumberController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Patient Management'),
+        backgroundColor: Colors.purple.shade700,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: const [
+            Tab(text: 'Add New Patient'),
+            Tab(text: 'Claim Patient'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _AddNewPatientTab(), // Separate widget for adding new patient
+          _ClaimPatientTab(), // Separate widget for claiming patients
+        ],
+      ),
+    );
+  }
+}
+
+// --- Add New Patient Tab ---
+class _AddNewPatientTab extends StatefulWidget {
+  const _AddNewPatientTab();
+
+  @override
+  State<_AddNewPatientTab> createState() => _AddNewPatientTabState();
+}
+
+class _AddNewPatientTabState extends State<_AddNewPatientTab> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _dateOfBirthController = TextEditingController(); // NEW: For DOB
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _contactController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _conditionController = TextEditingController();
+  final TextEditingController _emergencyContactNameController = TextEditingController();
+  final TextEditingController _emergencyContactNumberController = TextEditingController();
+  final TextEditingController _locationNameController = TextEditingController();
+  final TextEditingController _latitudeController = TextEditingController();
+  final TextEditingController _longitudeController = TextEditingController();
+
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
+    _dateOfBirthController.dispose(); // Dispose DOB controller
+    _genderController.dispose();
+    _contactController.dispose();
     _addressController.dispose();
     _conditionController.dispose();
     _emergencyContactNameController.dispose();
     _emergencyContactNumberController.dispose();
-    _tabController.dispose(); // Dispose tab controller
+    _locationNameController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
     super.dispose();
   }
 
   Future<void> _selectDateOfBirth(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      // Pre-fill with existing date if available, otherwise default to 20 years ago
       initialDate: _dateOfBirthController.text.isNotEmpty
           ? DateTime.tryParse(_dateOfBirthController.text) ?? DateTime.now().subtract(const Duration(days: 365 * 20))
           : DateTime.now().subtract(const Duration(days: 365 * 20)),
@@ -87,183 +112,196 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
     if (!mounted) return;
     if (picked != null) {
       setState(() {
-        _dateOfBirthController.text = DateFormat('yyyy-MM-dd').format(picked); // Format for display
+        _dateOfBirthController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
 
-  Future<void> _addPatient() async {
-    if (_addPatientFormKey.currentState!.validate()) {
+  int _calculateAge(DateTime dob) {
+    DateTime today = DateTime.now();
+    int age = today.year - dob.year;
+    if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  // NEW: Function to navigate to map and get result
+  Future<void> _selectLocationFromMap() async {
+    final LatLng? initialLocation = (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+        ? LatLng(double.parse(_latitudeController.text), double.parse(_longitudeController.text))
+        : null;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SelectLocationOnMapScreen(
+          initialLocation: initialLocation,
+          initialLocationName: _locationNameController.text.trim(),
+        ),
+      ),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        _isLoadingAddPatient = true; // Start loading for add patient
+        _latitudeController.text = result['latitude']?.toStringAsFixed(6) ?? '';
+        _longitudeController.text = result['longitude']?.toStringAsFixed(6) ?? '';
+        _locationNameController.text = result['locationName'] ?? '';
+      });
+    }
+  }
+
+  Future<void> _addNewPatient() async {
+    final currentContext = context; // Capture context
+
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
       });
 
       try {
-        DateTime? dob;
-        int? age;
-        if (_dateOfBirthController.text.isNotEmpty) {
-          dob = DateTime.parse(_dateOfBirthController.text);
-          DateTime today = DateTime.now();
-          age = today.year - dob.year;
-          if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
-            age--;
+        User? currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          if (currentContext.mounted) {
+            ScaffoldMessenger.of(currentContext).showSnackBar(
+              const SnackBar(content: Text('Error: Nurse not logged in.'), backgroundColor: Colors.red),
+            );
           }
+          return;
         }
 
-        // Create a map of patient data to save to Firestore
-        Map<String, dynamic> patientData = {
-          'name': _fullNameController.text.trim(),
-          'dob': dob != null ? Timestamp.fromDate(dob) : null, // Store DOB as Timestamp
-          'age': age, // Store calculated age
-          'gender': _selectedGender ?? 'N/A',
-          'contact': _contactNumberController.text.trim(),
-          'email': _emailController.text.trim(),
-          'address': _addressController.text.trim(),
-          'condition': _conditionController.text.trim(),
-          'medications': [],
-          'treatmentHistory': [],
-          'notes': [],
-          'imageUrls': [],
-          'lastVisit': 'N/A',
-          'nextAppointmentId': null,
-          'emergencyContactName': _emergencyContactNameController.text.trim(),
-          'emergencyContactNumber': _emergencyContactNumberController.text.trim(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'nurseId': null, // New patients are unassigned by default
-          'status': 'unassigned', // New patients are unassigned by default
-        };
+        double? latitude = double.tryParse(_latitudeController.text.trim());
+        double? longitude = double.tryParse(_longitudeController.text.trim());
 
-        // Add the patient data to the 'patients' collection in Firestore
-        final docRef = await FirebaseFirestore.instance.collection('patients').add(patientData);
-        debugPrint('Patient added with ID: ${docRef.id}'); // Log new document ID
+        DateTime? dob;
+        int? calculatedAge;
+        if (_dateOfBirthController.text.isNotEmpty) {
+          dob = DateTime.parse(_dateOfBirthController.text);
+          calculatedAge = _calculateAge(dob);
+        }
 
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Patient ${_fullNameController.text} added successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        final newPatient = Patient(
+          id: '',
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          age: calculatedAge?.toString() ?? 'N/A', // Use calculatedAge for display 'age'
+          gender: _genderController.text.trim(),
+          contact: _contactController.text.trim(),
+          address: _addressController.text.trim(),
+          condition: _conditionController.text.trim(),
+          medications: [],
+          treatmentHistory: [],
+          notes: [],
+          imageUrls: [],
+          lastVisit: 'N/A',
+          emergencyContactName: _emergencyContactNameController.text.trim().isNotEmpty
+              ? _emergencyContactNameController.text.trim()
+              : null,
+          emergencyContactNumber: _emergencyContactNumberController.text.trim().isNotEmpty
+              ? _emergencyContactNumberController.text.trim()
+              : null,
+          createdAt: DateTime.now(),
+          nurseId: null,
+          status: 'unassigned',
+          latitude: latitude,
+          longitude: longitude,
+          locationName: _locationNameController.text.trim().isNotEmpty
+              ? _locationNameController.text.trim()
+              : null,
+          dob: dob, // NEW: Pass DOB
+          calculatedAge: calculatedAge, // NEW: Pass calculatedAge
         );
-        // Clear fields and reset form state after adding
-        _fullNameController.clear();
-        _dateOfBirthController.clear();
-        _contactNumberController.clear();
+
+        await FirebaseFirestore.instance.collection('patients').add(newPatient.toFirestore());
+
+        if (!currentContext.mounted) return;
+
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          const SnackBar(content: Text('Patient added successfully!'), backgroundColor: Colors.green),
+        );
+        // Clear form fields
+        _nameController.clear();
         _emailController.clear();
+        _dateOfBirthController.clear(); // Clear DOB
+        _genderController.clear();
+        _contactController.clear();
         _addressController.clear();
         _conditionController.clear();
         _emergencyContactNameController.clear();
         _emergencyContactNumberController.clear();
-        setState(() {
-          _selectedGender = null;
-          _addPatientFormKey.currentState?.reset(); // Reset form validation state
-        });
+        _locationNameController.clear();
+        _latitudeController.clear();
+        _longitudeController.clear();
+      } on FirebaseException catch (e) {
+        debugPrint('Firebase Error adding patient: $e');
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(content: Text('Failed to add patient: ${e.message}'), backgroundColor: Colors.red),
+          );
+        }
       } catch (e) {
         debugPrint('Error adding patient: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to add patient: $e'),
-              backgroundColor: Colors.red,
-            ),
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(content: Text('Failed to add patient: $e'), backgroundColor: Colors.red),
           );
         }
       } finally {
         if (mounted) {
           setState(() {
-            _isLoadingAddPatient = false; // Stop loading
+            _isLoading = false;
           });
         }
       }
     }
   }
 
-  // Function to claim an unassigned patient
-  Future<void> _claimPatient(String patientDocId) async {
-    if (_currentNurseId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: Nurse ID not found. Please log in again.')),
-        );
-      }
-      return;
-    }
-
-    setState(() {
-      _loadingClaimingIds.add(patientDocId); // Add patient ID to loading set
-    });
-
-    try {
-      await FirebaseFirestore.instance.collection('patients').doc(patientDocId).update({
-        'nurseId': _currentNurseId,
-        'status': 'assigned',
-      });
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Patient claimed successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      debugPrint('Error claiming patient: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to claim patient: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingClaimingIds.remove(patientDocId); // Remove patient ID from loading set
-        });
-      }
-    }
-  }
-
-  // Helper method to build the 'Add New Patient' form
-  Widget _buildAddPatientForm() {
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
-        key: _addPatientFormKey,
+        key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Patient Information',
+              'Add New Patient Details',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
+                color: Colors.purple.shade700,
               ),
             ),
             const SizedBox(height: 24),
 
-            // Full Name
             TextFormField(
-              controller: _fullNameController,
+              controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Full Name',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person),
               ),
-              textInputAction: TextInputAction.next, // Next action
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter full name';
+                  return 'Please enter patient\'s full name';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
 
-            // Date of Birth
+            TextFormField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email (Optional)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+
+            // NEW: Date of Birth input
             InkWell(
               onTap: () => _selectDateOfBirth(context),
               child: InputDecorator(
@@ -282,75 +320,45 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
             ),
             const SizedBox(height: 16),
 
-            // Gender Selection
-            DropdownButtonFormField<String>(
-              value: _selectedGender,
-              hint: const Text('Select Gender'),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.wc),
-              ),
-              items: _genders.map((String gender) {
-                return DropdownMenuItem<String>(
-                  value: gender,
-                  child: Text(gender),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedGender = newValue;
-                });
-                FocusScope.of(context).nextFocus(); // Move focus after selection
-              },
-              validator: (value) => value == null ? 'Please select gender' : null,
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _genderController,
+                    decoration: const InputDecoration(
+                      labelText: 'Gender',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.wc),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Enter gender';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
-            // Contact Number
             TextFormField(
-              controller: _contactNumberController,
+              controller: _contactController,
               decoration: const InputDecoration(
                 labelText: 'Contact Number',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone),
               ),
               keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter contact number';
                 }
-                // Basic phone number validation (digits only, min length)
-                if (!RegExp(r'^[0-9]+$').hasMatch(value) || value.length < 10) {
-                  return 'Please enter a valid 10-digit phone number';
-                }
                 return null;
               },
             ),
             const SizedBox(height: 16),
 
-            // Email
-            TextFormField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email (Optional)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
-              validator: (value) {
-                if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                  return 'Please enter a valid email address';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Address
             TextFormField(
               controller: _addressController,
               decoration: const InputDecoration(
@@ -359,38 +367,117 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
                 prefixIcon: Icon(Icons.home),
               ),
               maxLines: 2,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _conditionController,
+              decoration: const InputDecoration(
+                labelText: 'Primary Condition',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.medical_information),
+              ),
+              maxLines: 2,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter address';
+                  return 'Please enter primary condition';
                 }
                 return null;
               },
             ),
+            const SizedBox(height: 24),
+
+            Text(
+              'Location Details',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.purple.shade700,
+              ),
+            ),
             const SizedBox(height: 16),
 
-            // Condition
-            TextFormField(
-              controller: _conditionController,
-              decoration: const InputDecoration(
-                labelText: 'Condition (e.g., Diabetes, Hypertension)',
-                hintText: 'e.g., "Type 2 Diabetes"',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.medical_services),
-              ),
-              maxLines: 2,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+            // Location Name and Select from Map Button
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _locationNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Location Name (e.g., Home, Clinic)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.place),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a location name';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.map, size: 30),
+                  onPressed: _selectLocationFromMap, // Call the new function
+                  tooltip: 'Select location on map',
+                  color: Colors.purple.shade700,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _latitudeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.gps_fixed),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Enter latitude';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Invalid number';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _longitudeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.gps_not_fixed),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Enter longitude';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Invalid number';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
 
-            // Emergency Contact Section
             Text(
-              'Emergency Contact Information',
+              'Emergency Contact (Optional)',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.secondary,
+                color: Colors.purple.shade700,
               ),
             ),
             const SizedBox(height: 16),
@@ -400,10 +487,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
               decoration: const InputDecoration(
                 labelText: 'Emergency Contact Name',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person_add),
+                prefixIcon: Icon(Icons.person_outline),
               ),
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 16),
 
@@ -412,24 +497,22 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
               decoration: const InputDecoration(
                 labelText: 'Emergency Contact Number',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone_in_talk),
+                prefixIcon: Icon(Icons.phone_android),
               ),
               keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.done, // Last field, so 'done'
-              onFieldSubmitted: (_) => _addPatient(), // Submit form on done
             ),
             const SizedBox(height: 40),
 
             SizedBox(
               width: double.infinity,
-              child: _isLoadingAddPatient
+              child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
-                onPressed: _addPatient,
-                icon: const Icon(Icons.person_add),
+                onPressed: _addNewPatient,
+                icon: const Icon(Icons.save),
                 label: const Text('Add Patient'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Colors.purple.shade700,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -445,124 +528,205 @@ class _AddPatientScreenState extends State<AddPatientScreen> with SingleTickerPr
       ),
     );
   }
+}
 
-  // Helper method to build the 'Claim Patient' list view
-  Widget _buildClaimPatientList() {
-    if (_currentNurseId == null) {
-      return const Center(
-        child: Text('Please log in as a nurse to claim patients.'),
-      );
+// --- Claim Patient Tab ---
+class _ClaimPatientTab extends StatefulWidget {
+  const _ClaimPatientTab();
+
+  @override
+  State<_ClaimPatientTab> createState() => _ClaimPatientTabState();
+}
+
+class _ClaimPatientTabState extends State<_ClaimPatientTab> {
+  User? _currentUser;
+  String? _currentNurseName;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    _currentUser = FirebaseAuth.instance.currentUser;
+    if (_currentUser == null) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'User not logged in. Cannot claim patients.';
+        });
+      }
+      return;
     }
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'Unassigned Patients',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('patients')
-                .where('status', isEqualTo: 'unassigned')
-                .where('nurseId', isNull: true) // Ensure nurseId is null
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                debugPrint('Error fetching unassigned patients: ${snapshot.error}');
-                return Center(child: Text('Error: ${snapshot.error}'));
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('No unassigned patients found.'));
-              }
 
-              final unassignedPatients = snapshot.data!.docs;
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUser!.uid)
+          .get();
+      if (userDoc.exists) {
+        _currentNurseName = userDoc.get('fullName') ?? 'Nurse';
+      } else {
+        _currentNurseName = 'Nurse';
+      }
+    } catch (e) {
+      debugPrint('Error initializing user for claim tab: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load nurse data: $e';
+        });
+      }
+    }
+  }
 
-              return ListView.builder(
-                itemCount: unassignedPatients.length,
-                itemBuilder: (context, index) {
-                  final patientDoc = unassignedPatients[index];
-                  final patientData = patientDoc.data() as Map<String, dynamic>;
-                  final patientName = patientData['name'] ?? 'Unknown Patient';
-                  final patientCondition = patientData['condition'] ?? 'N/A';
-                  final patientId = patientDoc.id; // Get the patient's document ID
+  Future<void> _claimPatient(String patientId) async {
+    final currentContext = context; // Capture context
 
-                  // Check if this specific patient's claim button is loading
-                  final bool isClaiming = _loadingClaimingIds.contains(patientId);
+    if (_currentUser == null || _currentNurseName == null) {
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          const SnackBar(content: Text('Error: Nurse not logged in.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16.0),
-                      leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                        child: Text(
-                          patientName[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      title: Text(
-                        patientName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text('Condition: $patientCondition'),
-                      trailing: isClaiming // Use per-patient loading state
-                          ? const CircularProgressIndicator()
-                          : ElevatedButton(
-                        onPressed: () => _claimPatient(patientId), // Pass the patient ID
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Claim'),
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
+    try {
+      await FirebaseFirestore.instance.collection('patients').doc(patientId).update({
+        'nurseId': _currentUser!.uid,
+        'status': 'assigned',
+      });
+
+      if (!currentContext.mounted) return;
+
+      ScaffoldMessenger.of(currentContext).showSnackBar(
+        const SnackBar(content: Text('Patient claimed successfully!'), backgroundColor: Colors.green),
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase Error claiming patient: $e');
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          SnackBar(content: Text('Failed to claim patient: ${e.message}'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error claiming patient: $e');
+      if (currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).showSnackBar(
+          SnackBar(content: Text('Failed to claim patient: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Patient Management'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'Add New Patient', icon: Icon(Icons.person_add)),
-            Tab(text: 'Claim Patient', icon: Icon(Icons.assignment_ind)),
-          ],
+    if (_currentUser == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _errorMessage.isNotEmpty ? _errorMessage : 'Please log in as a nurse to claim patients.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildAddPatientForm(), // Tab 1: Add New Patient
-          _buildClaimPatientList(), // Tab 2: Claim Patient
-        ],
-      ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('patients')
+          .where('status', isEqualTo: 'unassigned')
+          .where('nurseId', isNull: true) // Ensure nurseId is explicitly null
+          .orderBy('createdAt', descending: true) // Show newest unassigned patients first
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error fetching unassigned patients stream: ${snapshot.error}');
+          return Center(child: Text('Error loading patients: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text('No unassigned patients available for claiming.'),
+          );
+        }
+
+        final unassignedPatients = snapshot.data!.docs.map((doc) {
+          return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+        }).toList();
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: unassignedPatients.length,
+          itemBuilder: (context, index) {
+            final patient = unassignedPatients[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8.0),
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patient.name,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Condition: ${patient.condition.isNotEmpty ? patient.condition : 'N/A'}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Text(
+                      'Address: ${patient.address.isNotEmpty ? patient.address : 'N/A'}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (patient.locationName != null && patient.locationName!.isNotEmpty)
+                      Text(
+                        'Location Name: ${patient.locationName}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    if (patient.latitude != null && patient.longitude != null)
+                      Text(
+                        'Coordinates: ${patient.latitude!.toStringAsFixed(4)}, ${patient.longitude!.toStringAsFixed(4)}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _claimPatient(patient.id),
+                        icon: const Icon(Icons.person_add),
+                        label: const Text('Claim Patient'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

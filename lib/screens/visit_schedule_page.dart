@@ -18,7 +18,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
   User? _currentUser;
   String? _errorMessage;
 
-  // NEW: Calendar related state
+  // Calendar related state
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -44,14 +44,14 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
     }
   }
 
-  // NEW: Helper function to get events for a given day
+  // Helper function to get events for a given day
   List<Appointment> _getEventsForDay(DateTime day) {
     // Normalize the day to ensure consistent keys (no time component)
     final normalizedDay = DateTime.utc(day.year, day.month, day.day);
     return _events[normalizedDay] ?? [];
   }
 
-  // NEW: Callback for when a day is selected on the calendar
+  // Callback for when a day is selected on the calendar
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     if (!isSameDay(_selectedDay, selectedDay)) {
       setState(() {
@@ -115,13 +115,13 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body: Column( // NEW: Use Column to arrange calendar and list
+      body: Column(
         children: [
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('appointments')
                 .where('assignedToId', isEqualTo: _currentUser!.uid) // Filter by current nurse
-            // NEW: Fetch a wider range of dates for the calendar
+                .where('type', isEqualTo: 'Home Visit') // NEW: Filter for 'Home Visit' type
                 .where('dateTime', isGreaterThanOrEqualTo: kFirstDay)
                 .where('dateTime', isLessThanOrEqualTo: kLastDay)
                 .orderBy('dateTime', descending: false) // Order by date ascending for calendar
@@ -154,7 +154,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                     _buildCalendar(), // Still show calendar even if no appointments
                     const SizedBox(height: 16),
                     const Center(
-                      child: Text('You have no visits scheduled yet within the calendar range.'),
+                      child: Text('You have no home visits scheduled yet within the calendar range.'),
                     ),
                   ],
                 );
@@ -163,6 +163,8 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
               // Process fetched appointments for the calendar
               _events.clear(); // Clear previous events
               for (var doc in snapshot.data!.docs) {
+                // The Appointment.fromFirestore factory already handles the overdue logic
+                // and sets the correct status and statusColor.
                 final appointment = Appointment.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
                 // Normalize date to UTC midnight for consistent grouping
                 final normalizedDate = DateTime.utc(appointment.dateTime.year, appointment.dateTime.month, appointment.dateTime.day);
@@ -180,7 +182,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
             },
           ),
           const SizedBox(height: 8.0),
-          // NEW: Section title for selected day's appointments
+          // Section title for selected day's appointments
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
@@ -194,7 +196,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
             ),
           ),
           const SizedBox(height: 8.0),
-          Expanded( // NEW: Wrap ListView.builder in Expanded
+          Expanded( // Wrap ListView.builder in Expanded
             child: _selectedAppointments.isEmpty
                 ? Center(
               child: Text(
@@ -265,6 +267,20 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
                         Text(
                           'Notes: ${visit.notes.isNotEmpty ? visit.notes : 'N/A'}',
                           style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        // NEW: Display time remaining or overdue status
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            visit.isOverdue
+                                ? 'Status: Overdue'
+                                : 'Time Remaining: ${visit.getTimeRemainingString()}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: visit.isOverdue ? Colors.red : Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         // Action buttons for nurse to manage visits
@@ -354,7 +370,7 @@ class _VisitSchedulePageState extends State<VisitSchedulePage> {
     );
   }
 
-  // NEW: Helper method to build the TableCalendar widget
+  // Helper method to build the TableCalendar widget
   Widget _buildCalendar() {
     return TableCalendar<Appointment>(
       firstDay: kFirstDay,

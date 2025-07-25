@@ -39,7 +39,17 @@
     <link rel="manifest" href="manifest.json">
 
     <!-- Google Maps JavaScript API -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDMFS9Xtlw7YAKZaPez2cnVn1-sON8ZVhk"></script>
+    <!-- Added callback function to ensure API is loaded before Flutter tries to use it -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDMFS9Xtlw7YAKZaPez2cnVn1-sON8ZVhk&callback=_googleMapsReady" async defer></script>
+    <script>
+        // Define a global variable to indicate Google Maps API readiness
+        window.googleMapsApiReady = false;
+        function _googleMapsReady() {
+          window.googleMapsApiReady = true;
+          console.log('Google Maps API is ready!');
+          // You could also dispatch a custom event here if needed for more complex scenarios
+        }
+    </script>
 </head>
 <body>
 <!-- This script loads the Flutter engine and your app.

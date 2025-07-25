@@ -129,6 +129,8 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
               // Process fetched appointments for the calendar
               _events.clear(); // Clear previous events
               for (var doc in snapshot.data!.docs) {
+                // The Appointment.fromFirestore factory already handles the overdue logic
+                // and sets the correct status and statusColor.
                 final appointment = Appointment.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
                 // Normalize date to UTC midnight for consistent grouping
                 final normalizedDate = DateTime.utc(appointment.dateTime.year, appointment.dateTime.month, appointment.dateTime.day);
@@ -231,6 +233,20 @@ class _NurseAppointmentsScreenState extends State<NurseAppointmentsScreen> {
                         Text(
                           'Notes: ${appointment.notes.isNotEmpty ? appointment.notes : 'N/A'}',
                           style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        // NEW: Display time remaining or overdue status
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            appointment.isOverdue
+                                ? 'Status: Overdue'
+                                : 'Time Remaining: ${appointment.getTimeRemainingString()}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: appointment.isOverdue ? Colors.red : Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Align(

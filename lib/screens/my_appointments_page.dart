@@ -96,28 +96,9 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
           }
 
           final appointments = snapshot.data!.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            DateTime appointmentDateTime = (data['dateTime'] as Timestamp).toDate();
-
-            AppointmentStatus parsedStatus = AppointmentStatus.values.firstWhere(
-                  (e) => e.toString().split('.').last == (data['status'] ?? 'upcoming'),
-              orElse: () => AppointmentStatus.upcoming,
-            );
-
-            return Appointment(
-              id: doc.id,
-              patientId: data['patientId'] ?? '',
-              patientName: data['patientName'] ?? 'Unknown Patient',
-              type: data['type'] ?? 'General Consultation',
-              dateTime: appointmentDateTime,
-              location: data['location'] ?? 'N/A',
-              status: parsedStatus,
-              notes: data['notes'] ?? '',
-              assignedToId: data['assignedToId'], // Include assignedToId
-              assignedToName: data['assignedToName'], // Include assignedToName
-              createdAt: (data['createdAt'] as Timestamp).toDate(), // Include createdAt
-              statusColor: Appointment.getColorForStatus(parsedStatus),
-            );
+            // The Appointment.fromFirestore factory already handles the overdue logic
+            // and sets the correct status and statusColor.
+            return Appointment.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
           }).toList();
 
           return ListView.builder(
@@ -139,12 +120,13 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            // Display patientName here, as this is a patient's own appointment list
-                            'With: ${appointment.assignedToName ?? 'N/A'}',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                          Expanded(
+                            child: Text(
+                              'With: ${appointment.assignedToName ?? 'N/A'}',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                             ),
                           ),
                           Container(
@@ -162,7 +144,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Type: ${appointment.type}', // Display the appointment type
+                        'Type: ${appointment.type}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
@@ -184,12 +166,25 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 16),
+                      // NEW: Display time remaining or overdue status
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          appointment.isOverdue
+                              ? 'Status: Overdue'
+                              : 'Time Remaining: ${appointment.getTimeRemainingString()}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: appointment.isOverdue ? Colors.red : Colors.blue.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Align(
                         alignment: Alignment.bottomRight,
                         child: OutlinedButton.icon(
                           onPressed: () {
                             final currentContext = context; // Capture context
-                            // Navigate to AppointmentDetailsPage, passing the appointment object
                             Navigator.push(
                               currentContext,
                               MaterialPageRoute(
