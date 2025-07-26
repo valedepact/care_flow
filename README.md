@@ -45,9 +45,10 @@ Screenshots include:
   https://github.com/valedepact/care_flow/blob/main/home.jpg?raw=true
 
 - Messaging screen
-https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
+ https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
   
-- screen
+- Patient Management screen
+  https://github.com/valedepact/care_flow/blob/main/patient%20management.jpg?raw=true
   
 
 
