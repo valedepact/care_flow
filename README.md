@@ -42,7 +42,8 @@ CARE_FLOW is a home-based care management mobile application. It is designed to 
 Screenshots include:
 
 - Home screen
-  
+  https://github.com/valedepact/care_flow/blob/main/home.jpg?raw=true
+
 - Patient monitoring screen
   
 - Emergency alerts screen
