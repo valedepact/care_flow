@@ -47,7 +47,8 @@ Screenshots include:
 - Patient monitoring screen
   https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
 
-- Emergency alerts screen
+- Messaging screen
+
   
 - Google Maps routing screen
   
