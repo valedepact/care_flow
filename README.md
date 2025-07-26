@@ -44,13 +44,10 @@ Screenshots include:
 - Home screen
   https://github.com/valedepact/care_flow/blob/main/home.jpg?raw=true
 
-- Patient monitoring screen
-  https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
-
 - Messaging screen
-
+https://github.com/valedepact/care_flow/blob/main/messaging%20page.jpg?raw=true
   
-- Google Maps routing screen
+- screen
   
 
 
