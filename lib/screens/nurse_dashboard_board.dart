@@ -451,9 +451,10 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Caregiver Dashboard'),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: Colors.blueAccent.withOpacity(0.9),
         elevation: 4,
         actions: [
           IconButton(
@@ -475,191 +476,146 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           ),
         ],
       ),
-      body: _isLoadingDashboard // Use the combined loading state
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
-          : Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Nurse Icon
-              Icon(
-                Icons.local_hospital_outlined,
-                size: 100,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 20),
-
-              // Welcome Message
-              Text(
-                'Welcome, Nurse $_nurseName!',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Subtitle/Description
-              Text(
-                'Manage your patients, appointments, and daily tasks efficiently.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Quick Actions/Navigation Buttons
-              Wrap(
-                spacing: 16.0,
-                runSpacing: 16.0,
-                alignment: WrapAlignment.center,
-                children: [
-                  QuickActionButton(
-                    label: 'Patient Management',
-                    icon: Icons.group,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const AddPatientScreen()),
-                      );
-                      debugPrint('Patient Management pressed - Navigating to AddPatientScreen');
-                    },
-                    color: Colors.purple, // Added color
-                  ),
-                  QuickActionButton(
-                    label: 'My Appointments',
-                    icon: Icons.calendar_today,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
-                      );
-                      debugPrint('My Appointments pressed - Navigating to NurseAppointmentsScreen');
-                    },
-                    color: Colors.green, // Added color
-                  ),
-                  QuickActionButton(
-                    label: 'Visit Schedule',
-                    icon: Icons.schedule,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const VisitSchedulePage()),
-                      );
-                      debugPrint('Visit Schedule pressed - Navigating to VisitSchedulePage');
-                    },
-                    color: Colors.orange, // Added color
-                  ),
-                  QuickActionButton(
-                    label: 'Messages',
-                    icon: Icons.message,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ChatListPage()),
-                      );
-                      debugPrint('Messages pressed - Navigating to ChatListPage');
-                    },
-                    color: Colors.indigo, // Added color
-                  ),
-                  QuickActionButton(
-                    label: 'Navigation',
-                    icon: Icons.navigation,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
-                      );
-                      debugPrint('Navigation pressed - Navigating to NurseNavigationScreen');
-                    },
-                    color: Colors.redAccent.shade700,
-                  ),
-                  QuickActionButton(
-                    label: 'Emergency Alerts', // This button
-                    icon: Icons.notifications_active,
-                    onPressed: () {
-                      // Navigate to the comprehensive NurseAlertsManagementScreen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
-                      );
-                      debugPrint('Emergency Alerts pressed - Navigating to NurseAlertsManagementScreen');
-                    },
-                    color: Colors.red.shade700, // Make it stand out
-                  ),
-                  QuickActionButton(
-                    label: 'Generate Report',
-                    icon: Icons.description,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
-                      );
-                      debugPrint('Generate Report button pressed - Navigating to reports screen');
-                    },
-                    color: Colors.teal,
-                  ),
-                  QuickActionButton(
-                    label: 'Manage Alerts', // This button
-                    icon: Icons.list_alt,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NurseAlertsManagementScreen()),
-                      );
-                      debugPrint('Manage Alerts pressed from Nurse Dashboard');
-                    },
-                    color: Colors.deepPurple,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              // Recent Patients Card (now filtered)
-              _patientListCard(),
-              const SizedBox(height: 16), // Spacing between cards
-
-              // Upcoming Patients Visits Card
-              _upcomingPatientsVisitsCard(),
-            ],
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE3F0FF), Color(0xFFF8FBFF)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.blue,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Patients',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Schedule',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.description),
-            label: 'Reports',
-          ),
-        ],
+        child: _isLoadingDashboard
+            ? const Center(child: CircularProgressIndicator())
+            : Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Nurse Icon
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blueAccent.withOpacity(0.1),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18.0),
+                          child: Icon(
+                            Icons.local_hospital_outlined,
+                            size: 80,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Welcome Message
+                      Text(
+                        'Welcome, Nurse $_nurseName!',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent.shade700,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Here's a quick overview of your day.",
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.grey[700],
+                              fontStyle: FontStyle.italic,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      // Dashboard Cards
+                      Wrap(
+                        spacing: 32,
+                        runSpacing: 32,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 380,
+                            child: _patientListCard(),
+                          ),
+                          SizedBox(
+                            width: 380,
+                            child: _upcomingPatientsVisitsCard(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+                      // Dashboard Buttons
+                      Text(
+                        'Quick Actions',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent.shade700,
+                            ),
+                      ),
+                      const SizedBox(height: 20),
+                      Wrap(
+                        spacing: 24,
+                        runSpacing: 24,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _buildDashboardButton(
+                            context,
+                            icon: Icons.people_alt_rounded,
+                            label: 'Patients',
+                            onPressed: () => _onItemTapped(1),
+                            color: Colors.blue.shade100,
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            icon: Icons.calendar_month_rounded,
+                            label: 'Schedule',
+                            onPressed: () => _onItemTapped(2),
+                            color: Colors.green.shade100,
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            icon: Icons.navigation_rounded,
+                            label: 'Navigation',
+                            onPressed: () => _onItemTapped(3),
+                            color: Colors.orange.shade100,
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            icon: Icons.analytics_rounded,
+                            label: 'Reports',
+                            onPressed: () => _onItemTapped(4),
+                            color: Colors.purple.shade100,
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            icon: Icons.notifications_active_rounded,
+                            label: 'Alerts',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const NurseAlertsManagementScreen(),
+                                ),
+                              );
+                            },
+                            color: Colors.red.shade100,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }

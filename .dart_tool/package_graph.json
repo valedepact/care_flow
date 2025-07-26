@@ -139,6 +139,16 @@
       "dependencies": []
     },
     {
+      "name": "http",
+      "version": "1.4.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
+      ]
+    },
+    {
       "name": "url_launcher",
       "version": "6.3.2",
       "dependencies": [
@@ -740,6 +750,21 @@
       ]
     },
     {
+      "name": "web",
+      "version": "0.5.1",
+      "dependencies": []
+    },
+    {
+      "name": "http_parser",
+      "version": "4.1.2",
+      "dependencies": [
+        "collection",
+        "source_span",
+        "string_scanner",
+        "typed_data"
+      ]
+    },
+    {
       "name": "url_launcher_windows",
       "version": "3.1.4",
       "dependencies": [
@@ -978,25 +1003,10 @@
       ]
     },
     {
-      "name": "web",
-      "version": "0.5.1",
-      "dependencies": []
-    },
-    {
       "name": "json_annotation",
       "version": "4.9.0",
       "dependencies": [
         "meta"
-      ]
-    },
-    {
-      "name": "http_parser",
-      "version": "4.1.2",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner",
-        "typed_data"
       ]
     },
     {
@@ -1214,16 +1224,6 @@
       "version": "1.0.2",
       "dependencies": [
         "source_span"
-      ]
-    },
-    {
-      "name": "http",
-      "version": "1.4.0",
-      "dependencies": [
-        "async",
-        "http_parser",
-        "meta",
-        "web"
       ]
     }
   ],

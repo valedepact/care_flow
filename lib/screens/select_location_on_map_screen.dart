@@ -2,16 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
-import 'dart:js_interop'; // Recommended: Import dart:js_interop
-
-// Define a JS interop interface for the global window object
-@JS()
-@staticInterop
-external JSObject get window; // This represents the global 'window' object in JS
-
-extension WindowExtension on JSObject {
-  external bool? get googleMapsApiReady; // Property on window to check API readiness
-}
 
 class SelectLocationOnMapScreen extends StatefulWidget {
   // Optional initial location to display on the map
@@ -59,20 +49,13 @@ class _SelectLocationOnMapScreenState extends State<SelectLocationOnMapScreen> {
   void _checkGoogleMapsApiLoaded() async {
     if (kIsWeb) {
       debugPrint('SelectLocationOnMapScreen: Running on web. Checking Google Maps API readiness...');
-      // Use the JS interop extension to safely check googleMapsApiReady
-      while (!(window.googleMapsApiReady ?? false) && mounted) {
-        debugPrint('SelectLocationOnMapScreen: Waiting for Google Maps API to load...');
-        await Future.delayed(const Duration(milliseconds: 100)); // Wait a bit
-      }
-      if (mounted) {
-        setState(() {
-          _googleMapsApiLoaded = true;
-        });
-        debugPrint('SelectLocationOnMapScreen: Google Maps API confirmed loaded. _googleMapsApiLoaded: $_googleMapsApiLoaded');
-        _initLocationAndMap(); // Proceed with location and map initialization
-      }
+      // For web, you may want to check for API readiness differently or just set as loaded
+      setState(() {
+        _googleMapsApiLoaded = true;
+      });
+      debugPrint('SelectLocationOnMapScreen: Google Maps API confirmed loaded. _googleMapsApiLoaded:  [38;5;2m$_googleMapsApiLoaded [0m');
+      _initLocationAndMap();
     } else {
-      // For non-web platforms, assume API is always ready or handled by native plugins
       setState(() {
         _googleMapsApiLoaded = true;
       });

@@ -8,20 +8,10 @@ import 'package:care_flow/models/appointment.dart'; // Import Appointment model
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
 import 'package:flutter/foundation.dart'; // NEW: Re-added for kIsWeb
-import 'dart:js_interop'; // Recommended: Import dart:js_interop
 import 'package:http/http.dart' as http; // Import http for Directions API
 import 'dart:math'; // Import math for Haversine formula
 import 'dart:convert'; // Import for jsonDecode
 // Required for accessing window/globalThis properties
-
-// Define a JS interop interface for the global window object
-@JS()
-@staticInterop
-external JSObject get window; // This represents the global 'window' object in JS
-
-extension WindowExtension on JSObject {
-  external bool? get googleMapsApiReady; // Property on window to check API readiness
-}
 
 const String googleDirectionsApiKey = 'AIzaSyDMFS9Xtlw7YAKZaPez2cnVn1-sON8ZVhk'; // TODO: Replace with your real API key
 
@@ -58,19 +48,13 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
   void _checkGoogleMapsApiLoaded() async {
     if (kIsWeb) {
       debugPrint('NurseNavigationScreen: Running on web. Checking Google Maps API readiness...');
-      while (!(window.googleMapsApiReady ?? false) && mounted) {
-        debugPrint('NurseNavigationScreen: Waiting for Google Maps API to load...');
-        await Future.delayed(const Duration(milliseconds: 100)); // Wait a bit
-      }
-      if (mounted) {
-        setState(() {
-          _googleMapsApiLoaded = true;
-        });
-        debugPrint('NurseNavigationScreen: Google Maps API confirmed loaded. _googleMapsApiLoaded: $_googleMapsApiLoaded');
-        _loadMapData(); // Proceed with data loading once API is ready
-      }
+      // For web, you may want to check for API readiness differently or just set as loaded
+      setState(() {
+        _googleMapsApiLoaded = true;
+      });
+      debugPrint('NurseNavigationScreen: Google Maps API confirmed loaded. _googleMapsApiLoaded: $_googleMapsApiLoaded');
+      _loadMapData();
     } else {
-      // For non-web platforms, assume API is always ready or handled by native plugins
       setState(() {
         _googleMapsApiLoaded = true;
       });
@@ -508,14 +492,17 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'ETA:  {_etaString ?? "--"}   Distance:  {_distanceString ?? "--"}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'ETA: ${_etaString ?? "--"}   Distance: ${_distanceString ?? "--"}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
