@@ -32,7 +32,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   User? _currentUser;
   String? _currentUserRole; // To determine if current user is Patient or Nurse
 
-  bool _isEditing = false; // State to toggle inline edit mode for patient self-edit
+  bool _isEditing = true; // State to toggle inline edit mode for patient self-edit
 
   // Declare _formKey for the Form widget
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
