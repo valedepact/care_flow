@@ -33,7 +33,42 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
   bool _isLoadingDashboard = true; // Combined loading state for the whole dashboard
   List<Patient> _patients = []; // List of patients assigned to this nurse
   List<Appointment> _upcomingVisits = []; // List of upcoming visits for this nurse
-  int _selectedIndex = 0; // For BottomNavigationBar
+  int _selectedIndex = 0;
+
+  List<Widget> get _pages => [
+    // Dashboard main content
+    SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Welcome,  $_nurseName!',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _patientListCard(),
+          const SizedBox(height: 20),
+          _upcomingPatientsVisitsCard(),
+        ],
+      ),
+    ),
+    NursePatientListScreen(nurseId: _currentNurseId ?? ''),
+    NurseAppointmentsScreen(),
+    NurseNavigationScreen(),
+    NurseReportsScreen(),
+    NurseAlertsManagementScreen(),
+    ChatListPage(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   void initState() {
@@ -188,27 +223,28 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     Color? color,
   }) {
     return SizedBox(
-      width: 150,
+      width: 110, // Smaller width
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color ?? Theme.of(context).colorScheme.surfaceContainerHighest,
           foregroundColor: color != null ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8), // More compact
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16), // More rounded
           ),
-          elevation: 2,
+          elevation: 4,
+          shadowColor: Colors.black12,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 36),
-            const SizedBox(height: 8),
+            Icon(icon, size: 22), // Smaller icon
+            const SizedBox(height: 4),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600), // Smaller, bolder
             ),
           ],
         ),
@@ -412,244 +448,48 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     );
   }
 
-  void _onItemTapped(int index) {
-    final currentContext = context; // Capture context
-    setState(() {
-      _selectedIndex = index;
-    });
-    // Navigate based on index
-    switch (index) {
-      case 0: // Home (Dashboard) - no navigation needed, already here
-        break;
-      case 1: // Patients
-        Navigator.push(
-          currentContext,
-          MaterialPageRoute(builder: (context) => NursePatientListScreen(nurseId: _currentNurseId!)),
-        );
-        break;
-      case 2: // Schedule (Appointments)
-        Navigator.push(
-          currentContext,
-          MaterialPageRoute(builder: (context) => const NurseAppointmentsScreen()),
-        );
-        break;
-      case 3: // Map (Navigation)
-        Navigator.push(
-          currentContext,
-          MaterialPageRoute(builder: (context) => const NurseNavigationScreen()),
-        );
-        break;
-      case 4: // Reports
-        Navigator.push(
-          currentContext,
-          MaterialPageRoute(builder: (context) => const NurseReportsScreen()),
-        );
-        break;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text('Caregiver Dashboard'),
-        backgroundColor: Colors.blueAccent.withOpacity(0.9),
-        elevation: 4,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () {
-              debugPrint('Search button pressed');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_rounded),
-            onPressed: () {
-              debugPrint('Notifications button pressed');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Logout',
-          ),
-        ],
+      body: SafeArea(
+        child: _pages[_selectedIndex],
       ),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFE3F0FF), Color(0xFFF8FBFF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
           ),
-        ),
-        child: _isLoadingDashboard
-            ? const Center(child: CircularProgressIndicator())
-            : Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Nurse Icon
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blueAccent.withOpacity(0.1),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18.0),
-                          child: Icon(
-                            Icons.local_hospital_outlined,
-                            size: 80,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Welcome Message
-                      Text(
-                        'Welcome, Nurse $_nurseName!',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueAccent.shade700,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Here's a quick overview of your day.",
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.grey[700],
-                              fontStyle: FontStyle.italic,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-                      // Dashboard Cards
-                      Wrap(
-                        spacing: 32,
-                        runSpacing: 32,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 380,
-                            child: _patientListCard(),
-                          ),
-                          SizedBox(
-                            width: 380,
-                            child: _upcomingPatientsVisitsCard(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 40),
-                      // Dashboard Buttons
-                      Text(
-                        'Quick Actions',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueAccent.shade700,
-                            ),
-                      ),
-                      const SizedBox(height: 20),
-                      Wrap(
-                        spacing: 24,
-                        runSpacing: 24,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          _buildDashboardButton(
-                            context,
-                            icon: Icons.people_alt_rounded,
-                            label: 'Patients',
-                            onPressed: () => _onItemTapped(1),
-                            color: Colors.blue.shade100,
-                          ),
-                          _buildDashboardButton(
-                            context,
-                            icon: Icons.calendar_month_rounded,
-                            label: 'Schedule',
-                            onPressed: () => _onItemTapped(2),
-                            color: Colors.green.shade100,
-                          ),
-                          _buildDashboardButton(
-                            context,
-                            icon: Icons.navigation_rounded,
-                            label: 'Navigation',
-                            onPressed: () => _onItemTapped(3),
-                            color: Colors.orange.shade100,
-                          ),
-                          _buildDashboardButton(
-                            context,
-                            icon: Icons.analytics_rounded,
-                            label: 'Reports',
-                            onPressed: () => _onItemTapped(4),
-                            color: Colors.purple.shade100,
-                          ),
-                          _buildDashboardButton(
-                            context,
-                            icon: Icons.notifications_active_rounded,
-                            label: 'Alerts',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const NurseAlertsManagementScreen(),
-                                ),
-                              );
-                            },
-                            color: Colors.red.shade100,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-class QuickActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final Color color;
-
-  const QuickActionButton({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white, // Ensure text is white for better contrast on colored buttons
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      onPressed: onPressed,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon),
-          const SizedBox(width: 8),
-          Text(label),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_alt_rounded),
+            label: 'Patients',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month_rounded),
+            label: 'Schedule',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.navigation_rounded),
+            label: 'Navigation',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics_rounded),
+            label: 'Reports',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications_active_rounded),
+            label: 'Alerts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
         ],
       ),
     );

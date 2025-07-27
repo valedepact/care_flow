@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart'; // For current nurse's UID
 import 'package:care_flow/models/patient.dart'; // Import Patient model
 import 'package:care_flow/models/appointment.dart'; // Import Appointment model
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
 import 'package:flutter/foundation.dart'; // NEW: Re-added for kIsWeb
 import 'package:http/http.dart' as http; // Import http for Directions API
 import 'dart:math'; // Import math for Haversine formula
@@ -37,6 +36,16 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
 
   bool _googleMapsApiLoaded = false; // Flag to track API readiness for web
   bool _isLocationDetermined = false; // Flag to track if nurse location has been determined
+
+  // 1. Add state for full route info
+  List<LatLng> _fullRoutePoints = [];
+  List<String> _fullRouteSteps = [];
+  String? _fullRouteDistance;
+  String? _fullRouteDuration;
+  List<Patient> _todayPatients = [];
+
+  // Add state for custom selection
+  List<Patient> _customSelectedPatients = [];
 
   @override
   void initState() {
@@ -395,37 +404,295 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
   }
 
   // Method to launch external map application for directions
-  Future<void> _launchMapDirections() async {
-    if (_selectedPatientForNavigation == null ||
-        _selectedPatientForNavigation!.latitude == null ||
-        _selectedPatientForNavigation!.longitude == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a patient with valid coordinates.')),
-      );
-      return;
-    }
+  // Future<void> _launchMapDirections() async {
+  //   if (_selectedPatientForNavigation == null ||
+  //       _selectedPatientForNavigation!.latitude == null ||
+  //       _selectedPatientForNavigation!.longitude == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Please select a patient with valid coordinates.')),
+  //     );
+  //     return;
+  //   }
 
-    final LatLng destination = LatLng(
-      _selectedPatientForNavigation!.latitude!,
-      _selectedPatientForNavigation!.longitude!,
-    );
+  //   final LatLng destination = LatLng(
+  //     _selectedPatientForNavigation!.latitude!,
+  //     _selectedPatientForNavigation!.longitude!,
+  //   );
 
-    // Google Maps URL scheme for directions
-    // 'saddr' (source address/coordinates) can be omitted to use current location
-    // 'daddr' (destination address/coordinates)
-    final String googleMapsUrl =
-        'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}';
+  //   // Google Maps URL scheme for directions
+  //   // 'saddr' (source address/coordinates) can be omitted to use current location
+  //   // 'daddr' (destination address/coordinates)
+  //   final String googleMapsUrl =
+  //       'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}';
 
-    final Uri url = Uri.parse(googleMapsUrl);
+  //   final Uri url = Uri.parse(googleMapsUrl);
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not launch map for directions. URL: $googleMapsUrl')),
-        );
+  //   if (await canLaunchUrl(url)) {
+  //     await launchUrl(url);
+  //   } else {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Could not launch map for directions. URL: $googleMapsUrl')),
+  //       );
+  //     }
+  //   }
+  // }
+
+  // 2. Add method to plan full route
+  Future<void> _planFullRouteForToday() async {
+    if (_currentNursePosition == null) return;
+    // Get today's date (ignore time)
+    final today = DateTime.now();
+    // Find all patients with an appointment today
+    List<Patient> todayPatients = [];
+    List<String> waypoints = [];
+    List<LatLng> waypointLatLngs = [];
+    // Fetch today's appointments for assigned patients
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      List<String> assignedPatientIds = _allAssignedPatients.map((p) => p.id).toList();
+      QuerySnapshot appointmentSnapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('patientId', whereIn: assignedPatientIds)
+          .where('assignedToId', isEqualTo: currentUser.uid)
+          .where('dateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(today.year, today.month, today.day, 0, 0, 0)))
+          .where('dateTime', isLessThan: Timestamp.fromDate(DateTime(today.year, today.month, today.day, 23, 59, 59)))
+          .get();
+      Set<String> todayPatientIds = {};
+      for (var doc in appointmentSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        todayPatientIds.add(data['patientId']);
       }
+      todayPatients = _allAssignedPatients.where((p) => todayPatientIds.contains(p.id) && p.latitude != null && p.longitude != null).toList();
+      if (todayPatients.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No patients with appointments today.')));
+        return;
+      }
+      // Build waypoints string for Directions API
+      for (var patient in todayPatients) {
+        waypoints.add('${patient.latitude},${patient.longitude}');
+        waypointLatLngs.add(LatLng(patient.latitude!, patient.longitude!));
+      }
+      // Directions API call
+      final origin = '${_currentNursePosition!.latitude},${_currentNursePosition!.longitude}';
+      final waypointsStr = waypoints.join('|');
+      final url = 'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$origin&waypoints=optimize:true|$waypointsStr&key=$googleDirectionsApiKey&mode=driving';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          final polyline = route['overview_polyline']['points'];
+          final points = _decodePolyline(polyline);
+          final distance = route['legs'].fold(0, (sum, leg) => sum + (leg['distance']['value'] as int));
+          final duration = route['legs'].fold(0, (sum, leg) => sum + (leg['duration']['value'] as int));
+          // Get step-by-step directions
+          List<String> steps = [];
+          for (var leg in route['legs']) {
+            for (var step in leg['steps']) {
+              steps.add(_stripHtmlTags(step['html_instructions']));
+            }
+          }
+          setState(() {
+            _fullRoutePoints = points;
+            _fullRouteSteps = steps;
+            _fullRouteDistance = (distance / 1000).toStringAsFixed(2) + ' km';
+            _fullRouteDuration = (duration / 60).toStringAsFixed(0) + ' min';
+            _polylines.clear();
+            _polylines.add(Polyline(
+              polylineId: const PolylineId('full_route'),
+              points: points,
+              color: Colors.green,
+              width: 6,
+            ));
+            // Number patient markers in visit order
+            _markers.removeWhere((m) => m.markerId.value.startsWith('ordered_patient_'));
+            if (route['waypoint_order'] != null) {
+              for (int i = 0; i < route['waypoint_order'].length; i++) {
+                int patientIdx = route['waypoint_order'][i];
+                final patient = todayPatients[patientIdx];
+                _markers.add(Marker(
+                  markerId: MarkerId('ordered_patient_$i'),
+                  position: LatLng(patient.latitude!, patient.longitude!),
+                  infoWindow: InfoWindow(title: '${i + 1}. ${patient.name}', snippet: patient.locationName ?? patient.address),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                ));
+              }
+            }
+          });
+          // Show bottom sheet with summary and steps
+          _showFullRouteSummary();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No route found for today\'s patients.')));
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to fetch route from Directions API.')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error planning full route: $e')));
+    }
+  }
+
+  String _stripHtmlTags(String htmlText) {
+    return htmlText.replaceAll(RegExp(r'<[^>]*>'), '');
+  }
+
+  void _showFullRouteSummary() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Full Route Summary', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text('Total Distance:  ${_fullRouteDistance ?? "--"}'),
+              Text('Estimated Time:  ${_fullRouteDuration ?? "--"}'),
+              const Divider(),
+              Text('Directions:', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _fullRouteSteps.length,
+                  itemBuilder: (context, idx) => Text('${idx + 1}. ${_fullRouteSteps[idx]}'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Add state for custom selection
+  void _showCustomPatientSelectionSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        List<Patient> tempSelected = List.from(_customSelectedPatients);
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('Select Patients for Custom Route', style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _todayPatients.length,
+                      itemBuilder: (context, idx) {
+                        final patient = _todayPatients[idx];
+                        final selected = tempSelected.contains(patient);
+                        return CheckboxListTile(
+                          value: selected,
+                          title: Text(patient.name),
+                          subtitle: Text(patient.locationName ?? patient.address),
+                          onChanged: (val) {
+                            setModalState(() {
+                              if (val == true) {
+                                tempSelected.add(patient);
+                              } else {
+                                tempSelected.remove(patient);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.route),
+                      label: const Text('Plan Custom Route'),
+                      onPressed: () {
+                        if (tempSelected.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least one patient.')));
+                          return;
+                        }
+                        Navigator.pop(context);
+                        _planCustomRoute(tempSelected);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _planCustomRoute(List<Patient> selectedPatients) async {
+    if (_currentNursePosition == null) return;
+    if (selectedPatients.isEmpty) return;
+    List<String> waypoints = [];
+    for (var patient in selectedPatients) {
+      waypoints.add('${patient.latitude},${patient.longitude}');
+    }
+    final origin = '${_currentNursePosition!.latitude},${_currentNursePosition!.longitude}';
+    final waypointsStr = waypoints.join('|');
+    final url = 'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$origin&waypoints=optimize:true|$waypointsStr&key=$googleDirectionsApiKey&mode=driving';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['routes'] != null && data['routes'].isNotEmpty) {
+        final route = data['routes'][0];
+        final polyline = route['overview_polyline']['points'];
+        final points = _decodePolyline(polyline);
+        final distance = route['legs'].fold(0, (sum, leg) => sum + (leg['distance']['value'] as int));
+        final duration = route['legs'].fold(0, (sum, leg) => sum + (leg['duration']['value'] as int));
+        List<String> steps = [];
+        for (var leg in route['legs']) {
+          for (var step in leg['steps']) {
+            steps.add(_stripHtmlTags(step['html_instructions']));
+          }
+        }
+        setState(() {
+          _fullRoutePoints = points;
+          _fullRouteSteps = steps;
+          _fullRouteDistance = (distance / 1000).toStringAsFixed(2) + ' km';
+          _fullRouteDuration = (duration / 60).toStringAsFixed(0) + ' min';
+          _polylines.clear();
+          _polylines.add(Polyline(
+            polylineId: const PolylineId('custom_route'),
+            points: points,
+            color: Colors.purple,
+            width: 6,
+          ));
+          // Number patient markers in visit order
+          _markers.removeWhere((m) => m.markerId.value.startsWith('ordered_patient_'));
+          if (route['waypoint_order'] != null) {
+            for (int i = 0; i < route['waypoint_order'].length; i++) {
+              int patientIdx = route['waypoint_order'][i];
+              final patient = selectedPatients[patientIdx];
+              _markers.add(Marker(
+                markerId: MarkerId('ordered_patient_$i'),
+                position: LatLng(patient.latitude!, patient.longitude!),
+                infoWindow: InfoWindow(title: '${i + 1}. ${patient.name}', snippet: patient.locationName ?? patient.address),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+              ));
+            }
+          }
+        });
+        _showFullRouteSummary();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No route found for selected patients.')));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to fetch route from Directions API.')));
     }
   }
 
@@ -442,6 +709,62 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
         backgroundColor: Colors.redAccent.shade700,
         foregroundColor: Colors.white,
         elevation: 4,
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Colors.redAccent.shade700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.map, color: Colors.white, size: 40),
+                  const SizedBox(height: 8),
+                  Text('Navigation Actions', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.route),
+              title: const Text('Plan Full Route'),
+              onTap: () {
+                Navigator.pop(context);
+                _planFullRouteForToday();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('Custom Route'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCustomPatientSelectionSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_search),
+              title: const Text('Select Patient'),
+              onTap: () {
+                Navigator.pop(context);
+                _showPatientSelectionSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.directions),
+              title: const Text('Plan Route to Selected Patient'),
+              onTap: () {
+                Navigator.pop(context);
+                if (_selectedPatientForNavigation != null) {
+                  _drawRoutePolyline();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select a patient first to get directions.')),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ),
       body: _isLoadingMap || !essentialDataReady // Show loading if map data or essential data is not ready
           ? const Center(child: CircularProgressIndicator())
@@ -509,46 +832,9 @@ class _NurseNavigationScreenState extends State<NurseNavigationScreen> {
             ),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Select Patient FAB
-          FloatingActionButton.extended(
-            heroTag: 'selectPatientFab', // Unique tag for multiple FABs
-            onPressed: _showPatientSelectionSheet,
-            label: const Text('Select Patient'),
-            icon: const Icon(Icons.person_search),
-            backgroundColor: Colors.blue.shade700,
-            foregroundColor: Colors.white,
-          ),
-          const SizedBox(height: 16),
-          // Modified "Plan Route" / "Get Directions" FAB
-          FloatingActionButton.extended(
-            heroTag: 'planRouteFab', // Unique tag
-            onPressed: _selectedPatientForNavigation != null
-                ? _launchMapDirections
-                : () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please select a patient first to get directions.')),
-              );
-            },
-            label: Text(
-              _selectedPatientForNavigation != null
-                  ? 'Get Directions to ${_selectedPatientForNavigation!.name}'
-                  : 'Plan Route',
-            ),
-            icon: Icon(
-              _selectedPatientForNavigation != null
-                  ? Icons.directions
-                  : Icons.alt_route,
-            ),
-            backgroundColor: Colors.redAccent,
-            foregroundColor: Colors.white,
-          ),
-        ],
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // Position FABs to the right
+      // Remove floatingActionButton
+      // floatingActionButton: ...
+      // floatingActionButtonLocation: ...
     );
   }
 

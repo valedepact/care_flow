@@ -848,18 +848,19 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), // More compact
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16), // More rounded
         ),
-        elevation: 3,
+        elevation: 4,
+        shadowColor: Colors.black12,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 30),
-          const SizedBox(height: 8),
-          Text(label, textAlign: TextAlign.center),
+          Icon(icon, size: 20), // Smaller icon
+          const SizedBox(height: 4),
+          Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
     );

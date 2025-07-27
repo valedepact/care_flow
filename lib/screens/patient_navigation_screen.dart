@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'maps_screen.dart';
+import 'package:care_flow/screens/map_screen.dart';
 
 class PatientNavigationScreen extends StatelessWidget {
   final List<Map<String, dynamic>> patients = [

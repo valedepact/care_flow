@@ -31,6 +31,55 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   bool _isLoadingUpcomingAppointment = true;
   String _upcomingAppointmentErrorMessage = '';
 
+  int _selectedIndex = 0;
+
+  List<Widget> get _pages => [
+    // Dashboard main content
+    SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person_outline,
+            size: 100,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Welcome, 24_patientName!',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Here you can manage your appointments, view medical records, and communicate with your care team.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 40),
+          // You can add more dashboard summary widgets here if needed
+        ],
+      ),
+    ),
+    MyAppointmentsPage(),
+    MedicalRecordsPage(patientId: _patientId, patientName: _patientName),
+    ChatListPage(),
+    PatientPrescriptionsScreen(patientId: _patientId, patientName: _patientName),
+    PatientNotesScreen(patientId: _patientId, patientName: _patientName),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -194,368 +243,42 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           ),
         ],
       ),
-      body: (_isLoadingUserData || _isLoadingUpcomingAppointment)
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
-          : Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Patient Icon
-              Icon(
-                Icons.person_outline,
-                size: 100,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 20),
-
-              // Welcome Message
-              Text(
-                'Welcome, $_patientName!', // Dynamic patient name
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Subtitle/Description
-              Text(
-                'Here you can manage your appointments, view medical records, and communicate with your care team.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Quick Actions/Navigation Buttons
-              Wrap(
-                spacing: 16.0,
-                runSpacing: 16.0,
-                alignment: WrapAlignment.center,
-                children: [
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.calendar_today,
-                    label: 'My Appointments',
-                    onPressed: () {
-                      // Navigate to the MyAppointmentsPage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MyAppointmentsPage()),
-                      );
-                      debugPrint('My Appointments pressed - Navigating to appointments list');
-                    },
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.folder_open,
-                    label: 'Medical Records',
-                    onPressed: () {
-                      // Ensure patientId is available before navigating
-                      if (_patientId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MedicalRecordsPage( // Corrected: Using MedicalRecordsPage
-                              patientId: _patientId,
-                              patientName: _patientName,
-                            ),
-                          ),
-                        );
-                        debugPrint('Medical Records pressed - Navigating to medical records');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient ID not available. Cannot view records.')),
-                        );
-                      }
-                    },
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.message,
-                    label: 'Messages',
-                    onPressed: () {
-                      // Navigate to the ChatListPage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ChatListPage()),
-                      );
-                      debugPrint('Messages pressed - Navigating to chat list');
-                    },
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.medication,
-                    label: 'Prescriptions',
-                    onPressed: () {
-                      // Ensure patientId is available before navigating
-                      if (_patientId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PatientPrescriptionsScreen(
-                              patientId: _patientId,
-                              patientName: _patientName,
-                            ),
-                          ),
-                        );
-                        debugPrint('Prescriptions pressed - Navigating to prescriptions list');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient ID not available. Cannot view prescriptions.')),
-                        );
-                      }
-                    },
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.notes, // Icon for notes
-                    label: 'Notes',
-                    onPressed: () {
-                      // Ensure patientId is available before navigating
-                      if (_patientId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PatientNotesScreen(
-                              patientId: _patientId,
-                              patientName: _patientName,
-                            ),
-                          ),
-                        );
-                        debugPrint('Notes pressed - Navigating to patient notes');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient ID not available. Cannot view notes.')),
-                        );
-                      }
-                    },
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.notifications_active,
-                    label: 'Emergency Alert',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const EmergencyAlertsPage()),
-                      );
-                      debugPrint('Emergency Alert pressed');
-                    },
-                    color: Colors.red.shade700,
-                  ),
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.add_alarm,
-                    label: 'Set Reminder',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const AlertsPage()),
-                      );
-                      debugPrint('Set Reminder pressed from Patient Dashboard');
-                    },
-                    color: Colors.teal,
-                  ),
-                  // New: My Alerts button for patients
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.list_alt, // Icon for a list/alerts
-                    label: 'My Alerts',
-                    onPressed: () {
-                      // Navigate to MyAlertsScreen
-                      if (_patientId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const MyAlertsScreen()),
-                        );
-                        debugPrint('My Alerts pressed from Patient Dashboard - Navigating to My Alerts Screen');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient ID not available. Cannot view alerts.')),
-                        );
-                      }
-                    },
-                    color: Colors.deepPurple, // A distinct color
-                  ),
-                  // NEW: Edit Profile button for patients
-                  _buildDashboardButton(
-                    context,
-                    icon: Icons.edit,
-                    label: 'Edit Profile',
-                    onPressed: () {
-                      if (_patientId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PatientProfilePage(), // Correctly points to PatientProfilePage
-                          ),
-                        );
-                        debugPrint('Edit Profile pressed - Navigating to PatientProfilePage for self-edit');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient ID not available. Cannot edit profile.')),
-                        );
-                      }
-                    },
-                    color: Colors.blueGrey, // A distinct color
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              // Upcoming Appointment Card (now dynamic)
-              _isLoadingUpcomingAppointment
-                  ? const Center(child: CircularProgressIndicator())
-                  : _upcomingAppointmentErrorMessage.isNotEmpty
-                  ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    _upcomingAppointmentErrorMessage,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 16),
-                  ),
-                ),
-              )
-                  : _upcomingAppointment == null
-                  ? Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'No Upcoming Appointments',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      Text(
-                        'You currently have no appointments scheduled. Check back later or contact your care team to schedule one.',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                ),
-              )
-                  : Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Upcoming Appointment: ${_upcomingAppointment!.type}', // Display type
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      Row(
-                        children: [
-                          const Icon(Icons.person, color: Colors.grey, size: 24),
-                          const SizedBox(width: 10),
-                          Text(
-                            // Display assignedToName (nurse's name) for patient's dashboard
-                            'With: ${_upcomingAppointment!.assignedToName ?? 'N/A'}',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.event, color: Colors.grey, size: 24),
-                          const SizedBox(width: 10),
-                          Text(
-                            DateFormat('MMM d, yyyy - h:mm a').format(_upcomingAppointment!.dateTime),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            final currentContext = context; // Capture context
-                            // Navigate to AppointmentDetailsPage with the actual appointment object
-                            Navigator.push(
-                              currentContext,
-                              MaterialPageRoute(
-                                builder: (context) => AppointmentDetailsPage(appointment: _upcomingAppointment!),
-                              ),
-                            );
-                            debugPrint('View Appointment Details for ID: ${_upcomingAppointment!.id}');
-                          },
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('View Details'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      body: SafeArea(
+        child: _pages[_selectedIndex],
       ),
-    );
-  }
-
-  // Helper method for dashboard buttons
-  Widget _buildDashboardButton(BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    Color? color, // Added optional color parameter
-  }) {
-    return SizedBox(
-      width: 150, // Fixed width for consistent button size
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color ?? Theme.of(context).colorScheme.surfaceContainerHighest, // Use provided color or default
-          foregroundColor: color != null ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant, // Adjust foreground color based on background
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
           ),
-          elevation: 2,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 36),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ],
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today),
+            label: 'Appointments',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.folder_open),
+            label: 'Medical Records',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.medication),
+            label: 'Prescriptions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notes),
+            label: 'Notes',
+          ),
+        ],
       ),
     );
   }
