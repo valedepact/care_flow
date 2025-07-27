@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:care_flow/models/alert_model.dart'; // Import the Alert model
 import 'dart:async'; // Import for StreamSubscription
+import 'package:hive/hive.dart';
 
 class NurseAlertsScreen extends StatefulWidget {
   const NurseAlertsScreen({super.key});
@@ -28,17 +29,15 @@ class _NurseAlertsScreenState extends State<NurseAlertsScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeUserAndListenToAlerts();
+    _loadAlerts();
   }
 
   @override
   void dispose() {
-    _generalAlertsSubscription?.cancel();
-    _emergencyAlertsSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _initializeUserAndListenToAlerts() async {
+  Future<void> _loadAlerts() async {
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser == null) {
       if (mounted) {
@@ -49,6 +48,13 @@ class _NurseAlertsScreenState extends State<NurseAlertsScreen> {
       }
       return;
     }
+
+    // 1. Load from Hive first
+    var alertBox = Hive.box<Alert>('alerts');
+    setState(() {
+      _combinedAlerts = alertBox.values.toList();
+      _isLoadingAlerts = false;
+    });
 
     try {
       // Fetch all patients assigned to the current nurse
@@ -61,15 +67,13 @@ class _NurseAlertsScreenState extends State<NurseAlertsScreen> {
 
       Set<String> patientIds = {};
       for (var doc in patientSnapshot.docs) {
-        patientIds.add(doc.id); // Add patient's UID
+        patientIds.add(doc.id);
       }
 
       setState(() {
         _assignedPatientIds = patientIds;
-        _errorMessage = null; // Clear any previous errors
+        _errorMessage = null;
       });
-
-      debugPrint('NurseAlertsScreen: Assigned Patient IDs: $_assignedPatientIds');
 
       if (_assignedPatientIds.isEmpty) {
         if (mounted) {
@@ -78,17 +82,48 @@ class _NurseAlertsScreenState extends State<NurseAlertsScreen> {
             _isLoadingAlerts = false;
           });
         }
-        return; // Exit if no assigned patients
+        return;
       }
 
-      // Start listening to alerts from both collections
-      _listenToAlertStreams();
+      // Fetch alerts from Firestore
+      QuerySnapshot generalSnapshot = await FirebaseFirestore.instance
+          .collection('alerts')
+          .where('patientId', whereIn: _assignedPatientIds.toList())
+          .where('status', whereIn: ['active', 'critical', 'info', 'pending'])
+          .orderBy('timestamp', descending: true)
+          .get();
 
-    } catch (e) {
-      debugPrint('NurseAlertsScreen: Error fetching assigned patients: $e');
+      QuerySnapshot emergencySnapshot = await FirebaseFirestore.instance
+          .collection('emergencyAlerts')
+          .where('patientId', whereIn: _assignedPatientIds.toList())
+          .where('status', isEqualTo: 'pending')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      List<Alert> alerts = [];
+      for (var doc in generalSnapshot.docs) {
+        alerts.add(Alert.fromFirestore(doc.data() as Map<String, dynamic>, doc.id));
+      }
+      for (var doc in emergencySnapshot.docs) {
+        alerts.add(Alert.fromFirestore(doc.data() as Map<String, dynamic>, doc.id));
+      }
+      alerts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Update Hive
+      await alertBox.clear();
+      await alertBox.addAll(alerts);
+
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load assigned patients: $e';
+          _combinedAlerts = alerts;
+          _isLoadingAlerts = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('NurseAlertsScreen: Error fetching alerts: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load alerts: $e';
           _isLoadingAlerts = false;
         });
       }

@@ -37,7 +37,7 @@ class AppointmentDetailsPage extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: appointment.statusColor,
+                  color: Appointment.getColorForStatus(appointment.status),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(

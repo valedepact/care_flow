@@ -4,6 +4,7 @@ import 'package:care_flow/models/patient.dart';
 import 'package:care_flow/screens/patient_profile_page.dart';
 import 'package:geolocator/geolocator.dart'; // Import geolocator for distance calculation
 import 'package:google_maps_flutter/google_maps_flutter.dart'; // Import LatLng
+import 'package:hive/hive.dart';
 
 class NursePatientListScreen extends StatefulWidget {
   final String nurseId;
@@ -16,23 +17,31 @@ class NursePatientListScreen extends StatefulWidget {
 
 class _NursePatientListScreenState extends State<NursePatientListScreen> {
   LatLng? _currentNurseLocation; // Nurse's current location
-  List<Patient> _patientsWithDistance = []; // Patients with calculated distances
+  List<Patient> _patients = [];
   bool _isLoading = true;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _fetchPatientsAndNurseLocation();
+    _loadPatients();
   }
 
-  Future<void> _fetchPatientsAndNurseLocation() async {
+  Future<void> _loadPatients() async {
     final currentContext = context;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
+    // 1. Load from Hive first (fast, offline)
+    var patientBox = Hive.box<Patient>('patients');
+    setState(() {
+      _patients = patientBox.values.toList();
+      _isLoading = false;
+    });
+
+    // 2. Fetch from Firestore (if online), update Hive and UI
     if (widget.nurseId.isEmpty) {
       if (currentContext.mounted) {
         setState(() {
@@ -47,7 +56,6 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
       // 1. Get Nurse's Current Location
       bool serviceEnabled;
       LocationPermission permission;
-
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (currentContext.mounted) {
@@ -89,7 +97,7 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
 
       if (!currentContext.mounted) return;
 
-      // 2. Fetch Patients assigned to this Nurse
+      // 3. Fetch Patients assigned to this Nurse from Firestore
       QuerySnapshot patientSnapshot = await FirebaseFirestore.instance
           .collection('patients')
           .where('nurseId', isEqualTo: widget.nurseId)
@@ -101,49 +109,36 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
         return Patient.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
 
-      // 3. Calculate Distance and Sort
+      // Update Hive with latest patients
+      await patientBox.clear();
+      await patientBox.addAll(fetchedPatients);
+
+      // Calculate distances if nurse location is available
       if (_currentNurseLocation != null) {
         for (var patient in fetchedPatients) {
           if (patient.latitude != null && patient.longitude != null) {
-            double distanceInMeters = Geolocator.distanceBetween(
+            double distance = Geolocator.distanceBetween(
               _currentNurseLocation!.latitude,
               _currentNurseLocation!.longitude,
               patient.latitude!,
               patient.longitude!,
-            );
-            // Store distance in patient object (or a wrapper class/map) for sorting
-            // For simplicity, we'll store it in a temporary map for sorting
-            patient.distanceFromNurse = distanceInMeters / 1000; // Convert to kilometers
+            ) / 1000.0; // Convert to km
+            patient.distanceFromNurse = distance;
           } else {
-            patient.distanceFromNurse = double.infinity; // Put patients without coords at the end
+            patient.distanceFromNurse = double.infinity;
           }
         }
-        // Sort by distance
-        fetchedPatients.sort((a, b) {
-          // Handle null/infinity distances for robust sorting
-          if (a.distanceFromNurse == null && b.distanceFromNurse == null) return 0;
-          if (a.distanceFromNurse == null) return 1; // Nulls go to end
-          if (b.distanceFromNurse == null) return -1; // Nulls go to end
-          return a.distanceFromNurse!.compareTo(b.distanceFromNurse!);
-        });
-        debugPrint('NursePatientListScreen: Patients sorted by distance.');
-      } else {
-        debugPrint('NursePatientListScreen: Nurse location not available, skipping distance calculation and sorting.');
-        // If nurse location isn't available, sort by name as a fallback
-        fetchedPatients.sort((a, b) => a.name.compareTo(b.name));
+        fetchedPatients.sort((a, b) => (a.distanceFromNurse ?? double.infinity).compareTo(b.distanceFromNurse ?? double.infinity));
       }
 
-      if (currentContext.mounted) {
-        setState(() {
-          _patientsWithDistance = fetchedPatients;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _patients = fetchedPatients;
+        _isLoading = false;
+      });
     } catch (e) {
-      debugPrint('NursePatientListScreen: Error fetching patients or calculating distances: $e');
       if (currentContext.mounted) {
         setState(() {
-          _errorMessage = 'Failed to load patients or calculate distances: $e';
+          _errorMessage = 'Error loading patients: $e';
           _isLoading = false;
         });
       }
@@ -154,10 +149,43 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Claimed Patients'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-        elevation: 4,
+        title: const Text('Nurse Patient List'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.storage),
+            tooltip: 'Show Local Patients',
+            onPressed: () async {
+              var patientBox = Hive.box<Patient>('patients');
+              var localPatients = patientBox.values.toList();
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Local Patients (Hive)'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: localPatients.length,
+                      itemBuilder: (context, index) {
+                        final patient = localPatients[index];
+                        return ListTile(
+                          title: Text(patient.name),
+                          subtitle: Text('Age:  {patient.age}, Gender: ${patient.gender}'),
+                        );
+                      },
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -177,22 +205,22 @@ class _NursePatientListScreenState extends State<NursePatientListScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _fetchPatientsAndNurseLocation,
+                onPressed: _loadPatients,
                 child: const Text('Retry'),
               ),
             ],
           ),
         ),
       )
-          : _patientsWithDistance.isEmpty
+          : _patients.isEmpty
           ? const Center(
         child: Text('You have not claimed any patients yet.'),
       )
           : ListView.builder(
         padding: const EdgeInsets.all(16.0),
-        itemCount: _patientsWithDistance.length,
+        itemCount: _patients.length,
         itemBuilder: (context, index) {
-          final patient = _patientsWithDistance[index];
+          final patient = _patients[index];
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8.0),
             elevation: 2,

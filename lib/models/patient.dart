@@ -1,29 +1,57 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive/hive.dart';
 
-class Patient {
+part 'patient.g.dart';
+
+@HiveType(typeId: 0)
+class Patient extends HiveObject {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String name;
+  @HiveField(2)
   final String email;
+  @HiveField(3)
   final String age; // Keeping as String for flexibility (e.g., "25 years", "Infant")
+  @HiveField(4)
   final String gender;
+  @HiveField(5)
   final String contact;
+  @HiveField(6)
   final String address;
+  @HiveField(7)
   final String condition;
+  @HiveField(8)
   final List<String> medications;
+  @HiveField(9)
   final List<String> treatmentHistory;
+  @HiveField(10)
   final List<String> notes; // Keeping as List<String> for simplicity, consider a subcollection for full notes
+  @HiveField(11)
   final List<String> imageUrls;
+  @HiveField(12)
   final String lastVisit; // Keeping as String for simplicity, consider DateTime
+  @HiveField(13)
   final String? emergencyContactName; // Nullable
+  @HiveField(14)
   final String? emergencyContactNumber; // Nullable
+  @HiveField(15)
   final DateTime createdAt;
+  @HiveField(16)
   final String? nurseId; // Nullable, stores UID of assigned nurse
+  @HiveField(17)
   final String status; // e.g., 'unassigned', 'assigned'
+  @HiveField(18)
   final double? latitude; // New: Patient's location latitude
+  @HiveField(19)
   final double? longitude; // New: Patient's location longitude
+  @HiveField(20)
   final String? locationName; // New: A descriptive name for the patient's location
+  @HiveField(21)
   final DateTime? dob; // NEW: Date of Birth as DateTime
+  @HiveField(22)
   final int? calculatedAge; // NEW: Calculated age as int
+  @HiveField(23)
   double? distanceFromNurse; // NEW: Added for sorting patients by distance
 
   Patient({

@@ -1,0 +1,61 @@
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class PatientAlertAdapter extends TypeAdapter<PatientAlert> {
+  @override
+  final int typeId = 2;
+
+  @override
+  PatientAlert read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return PatientAlert(
+      id: fields[0] as String,
+      patientId: fields[1] as String,
+      patientName: fields[2] as String?,
+      description: fields[3] as String,
+      alertType: fields[4] as String,
+      scheduledDateTime: fields[5] as DateTime,
+      status: fields[6] as AlertStatus,
+      createdBy: fields[7] as String?,
+      createdByName: fields[8] as String?,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, PatientAlert obj) {
+    writer
+      ..writeByte(9)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.patientId)
+      ..writeByte(2)
+      ..write(obj.patientName)
+      ..writeByte(3)
+      ..write(obj.description)
+      ..writeByte(4)
+      ..write(obj.alertType)
+      ..writeByte(5)
+      ..write(obj.scheduledDateTime)
+      ..writeByte(6)
+      ..write(obj.status)
+      ..writeByte(7)
+      ..write(obj.createdBy)
+      ..writeByte(8)
+      ..write(obj.createdByName);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PatientAlertAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

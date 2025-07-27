@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For Color
+import 'package:hive/hive.dart';
+part 'appointment.g.dart';
 
 // Enum for appointment status
 enum AppointmentStatus {
@@ -11,19 +13,31 @@ enum AppointmentStatus {
   overdue, // NEW: Added 'overdue' status
 }
 
-class Appointment {
+@HiveType(typeId: 3)
+class Appointment extends HiveObject {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String patientId;
+  @HiveField(2)
   final String patientName;
+  @HiveField(3)
   final String type; // e.g., 'Check-up', 'Consultation', 'Vaccination'
+  @HiveField(4)
   final DateTime dateTime;
+  @HiveField(5)
   final String location;
+  @HiveField(6)
   final AppointmentStatus status; // This will now represent the *current* status from Firestore
+  @HiveField(7)
   final String notes;
+  @HiveField(8)
   final String? assignedToId; // ID of the nurse/caregiver assigned
+  @HiveField(9)
   final String? assignedToName; // Name of the nurse/caregiver assigned
+  @HiveField(10)
   final DateTime createdAt;
-  final Color statusColor; // Derived color for UI
+  // statusColor is not stored in Hive
 
   Appointment({
     required this.id,
@@ -37,7 +51,7 @@ class Appointment {
     this.assignedToId,
     this.assignedToName,
     required this.createdAt,
-    required this.statusColor, // Must be provided during construction
+    // required this.statusColor, // Must be provided during construction
   });
 
   // Factory constructor to create a Prescription from a Firestore DocumentSnapshot
@@ -69,7 +83,7 @@ class Appointment {
       assignedToId: data['assignedToId'],
       assignedToName: data['assignedToName'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
-      statusColor: Appointment.getColorForStatus(parsedStatus), // Derive color based on final status
+      // statusColor: Appointment.getColorForStatus(parsedStatus), // Derive color based on final status
     );
   }
 

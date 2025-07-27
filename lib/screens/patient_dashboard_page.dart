@@ -131,7 +131,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             assignedToId: data['assignedToId'], // Include assignedToId
             assignedToName: data['assignedToName'], // Include assignedToName
             createdAt: (data['createdAt'] as Timestamp).toDate(), // Include createdAt
-            statusColor: Appointment.getColorForStatus(parsedStatus),
           );
           _isLoadingUpcomingAppointment = false;
         });
