@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:care_flow/models/patient.dart'; // Import the Patient model
-import 'package:intl/intl.dart'; // For DateFormat
+
 import 'package:care_flow/screens/select_location_on_map_screen.dart'; // NEW: Import SelectLocationOnMapScreen
 import 'package:google_maps_flutter/google_maps_flutter.dart'; // NEW: Import LatLng
 import 'package:hive/hive.dart';
