@@ -10,6 +10,9 @@ class AlertsPage extends StatefulWidget {
   State<AlertsPage> createState() => _AlertsPageState();
 }
 
+class _AlertsPageState extends State<AlertsPage> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _descriptionController = TextEditingController();
 
   String? _selectedPatientId; // Store patient ID
   String? _selectedPatientName; // Store patient name for display
