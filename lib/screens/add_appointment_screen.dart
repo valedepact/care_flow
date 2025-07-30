@@ -29,7 +29,10 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _patientNameDisplayController = TextEditingController();
 
- 
+  User? _currentUser;
+  String? _currentUserName;
+  bool _isLoading = false;
+  bool _isInitialTimeSet = false;
 
   // List of predefined appointment types
   final List<String> _appointmentTypes = [
