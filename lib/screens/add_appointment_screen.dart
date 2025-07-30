@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
-import 'package:care_flow/models/appointment.dart'; // Import the Appointment model
+
 import 'package:care_flow/models/patient.dart'; // Import Patient model
 
 class AddAppointmentScreen extends StatefulWidget {
